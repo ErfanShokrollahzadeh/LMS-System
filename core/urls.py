@@ -1,13 +1,24 @@
-from django.urls import path
+from django.urls import path, include
+from rest_framework.routers import DefaultRouter
+from rest_framework_simplejwt.views import TokenRefreshView
 
-from . import views
+from .viewsets import (
+    UserViewSet,
+    EnrollmentViewSet,
+    TaskViewSet,
+    CustomTokenObtainPairView,
+)
+
+router = DefaultRouter()
+router.register(r"users", UserViewSet, basename="user")
+router.register(r"enrollments", EnrollmentViewSet, basename="enrollment")
+router.register(r"tasks", TaskViewSet, basename="task")
 
 urlpatterns = [
-    path("health/", views.health, name="health"),
-    path("me/", views.me, name="me"),
-    path("admin/enroll-teacher/", views.enroll_teacher, name="enroll_teacher"),
-    path("teacher/enroll-student/", views.enroll_student, name="enroll_student"),
-    path("teacher/students/", views.list_my_students, name="list_my_students"),
-    path("teacher/assign-task/", views.assign_task, name="assign_task"),
-    path("student/tasks/", views.my_tasks, name="my_tasks"),
+    # JWT Authentication
+    path("auth/login/", CustomTokenObtainPairView.as_view(),
+         name="token_obtain_pair"),
+    path("auth/refresh/", TokenRefreshView.as_view(), name="token_refresh"),
+    # API endpoints
+    path("", include(router.urls)),
 ]
