@@ -1,3 +1,5 @@
+# superuser username and pass : erfan8080 and admin1234
+
 from django.contrib import admin
 
 from .models import Enrollment, Task, User
