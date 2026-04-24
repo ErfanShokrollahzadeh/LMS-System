@@ -5,6 +5,7 @@ A production-oriented backend for a simple Learning Management System (LMS) buil
 ## Project Purpose
 
 This project solves the core operational flow of a school LMS:
+
 - Admin creates and manages teachers.
 - Teachers enroll students.
 - Teachers assign tasks to enrolled students.
@@ -15,6 +16,7 @@ It provides clear role boundaries, API-level security, and test coverage so the 
 ## What This System Is Good For
 
 This backend is a strong fit for:
+
 - Schools and training institutes that need a lightweight LMS core.
 - Academic teams that want task and enrollment workflows without building from scratch.
 - EdTech MVPs that need a secure and extensible backend quickly.
@@ -23,11 +25,13 @@ This backend is a strong fit for:
 ## Who Benefits Most
 
 ### Education Operations
+
 - School administrators who need controlled onboarding of teachers.
 - Teachers who need student roster ownership and assignment control.
 - Students who need a simple assignment tracking interface.
 
 ### Technical Teams
+
 - Backend developers learning Django REST + JWT with real-world patterns.
 - Frontend developers who need stable endpoints for React/Flutter/Vue apps.
 - QA engineers testing role-based and permission-sensitive systems.
@@ -61,15 +65,18 @@ This backend is a strong fit for:
 ## Role Responsibilities
 
 ### Admin
+
 - Enrolls teachers.
 - Can access administrative management interfaces.
 
 ### Teacher
+
 - Enrolls students.
 - Views own enrolled students.
 - Creates, updates, and deletes tasks for own students.
 
 ### Student
+
 - Views only own tasks.
 - Submits/marks own tasks as completed.
 
@@ -125,31 +132,38 @@ python manage.py runserver
 ```
 
 API base URL:
+
 - http://127.0.0.1:8000/api/
 
 Admin panel:
+
 - http://127.0.0.1:8000/admin/
 
 Health endpoint:
+
 - http://127.0.0.1:8000/api/health/
 
 ## API Surface (High-Level)
 
 Authentication:
+
 - POST /api/auth/login/
 - POST /api/auth/refresh/
 
 Users:
+
 - GET /api/users/me/
 - POST /api/users/register_student/
 - POST /api/users/enroll_teacher/
 - POST /api/users/enroll_student_by_teacher/
 
 Enrollments:
+
 - GET /api/enrollments/my_students/
 - POST /api/enrollments/enroll_existing_student/
 
 Tasks:
+
 - POST /api/tasks/
 - PATCH /api/tasks/{id}/update_task/
 - DELETE /api/tasks/{id}/delete_task/
@@ -166,6 +180,7 @@ python manage.py test
 ```
 
 Current project status:
+
 - 17 tests passing
 - role and permission checks validated
 - core workflows verified
@@ -187,6 +202,7 @@ Current project status:
 ## Growth Path
 
 Possible next upgrades:
+
 - Course and subject models.
 - File uploads for assignment submissions.
 - Grading and feedback modules.
