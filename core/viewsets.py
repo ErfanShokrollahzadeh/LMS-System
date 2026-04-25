@@ -38,14 +38,14 @@ class CustomTokenObtainPairView(TokenObtainPairView):
     pass
 
 
-class UserViewSet(viewsets.ModelViewSet):
+class StudentViewSet(viewsets.ModelViewSet):
     queryset = User.objects.all()
     serializer_class = UserSerializer
     permission_classes = [IsAuthenticated]
 
     @action(detail=False, methods=["get"])
     def me(self, request):
-        """Get current authenticated user profile."""
+        """Get current authenticated student profile."""
         serializer = self.get_serializer(request.user)
         return Response(serializer.data)
 
@@ -134,6 +134,10 @@ class UserViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_201_CREATED,
             )
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+# Backward-compatible alias for old imports.
+UserViewSet = StudentViewSet
 
 
 class EnrollmentViewSet(viewsets.ModelViewSet):

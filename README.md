@@ -150,12 +150,12 @@ Authentication:
 - POST /api/auth/login/
 - POST /api/auth/refresh/
 
-Users:
+Students:
 
-- GET /api/users/me/
-- POST /api/users/register_student/
-- POST /api/users/enroll_teacher/
-- POST /api/users/enroll_student_by_teacher/
+- GET /api/students/me/
+- POST /api/students/register_student/
+- POST /api/students/enroll_teacher/
+- POST /api/students/enroll_student_by_teacher/
 
 Enrollments:
 

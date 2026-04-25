@@ -3,14 +3,14 @@ from rest_framework.routers import DefaultRouter
 from rest_framework_simplejwt.views import TokenRefreshView
 
 from .viewsets import (
-    UserViewSet,
+    StudentViewSet,
     EnrollmentViewSet,
     TaskViewSet,
     CustomTokenObtainPairView,
 )
 
 router = DefaultRouter()
-router.register(r"users", UserViewSet, basename="user")
+router.register(r"students", StudentViewSet, basename="student")
 router.register(r"enrollments", EnrollmentViewSet, basename="enrollment")
 router.register(r"tasks", TaskViewSet, basename="task")
 

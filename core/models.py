@@ -19,6 +19,40 @@ class User(AbstractUser):
         choices=ROLE_CHOICES,
         default=IS_STUDENT,
     )
+    date_of_birth = models.DateField(
+        null=True,
+        blank=True,
+        verbose_name="Birth of Date",
+    )
+    GENDER_MALE = "male"
+    GENDER_FEMALE = "female"
+    GENDER_OTHER = "other"
+    GENDER_CHOICES = [
+        (GENDER_MALE, "Male"),
+        (GENDER_FEMALE, "Female"),
+        (GENDER_OTHER, "Other"),
+    ]
+    gender = models.CharField(
+        max_length=10,
+        choices=GENDER_CHOICES,
+        blank=True,
+        verbose_name="Gender",
+    )
+    current_academic = models.CharField(
+        max_length=150,
+        blank=True,
+        verbose_name="Current Academic",
+    )
+    enrolled_status = models.BooleanField(
+        default=True,
+        verbose_name="Enrolled Status",
+    )
+    profile_photo = models.ImageField(
+        upload_to="profile_photos/",
+        null=True,
+        blank=True,
+        verbose_name="Profile Photo",
+    )
     created_by = models.ForeignKey(
         "self",
         on_delete=models.SET_NULL,

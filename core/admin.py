@@ -4,12 +4,66 @@ from django.contrib import admin
 
 from .models import Enrollment, Task, User
 
+User._meta.verbose_name = "Student"
+User._meta.verbose_name_plural = "Students"
+
 
 @admin.register(User)
 class UserAdmin(admin.ModelAdmin):
-    list_display = ("username", "email", "role", "created_by", "is_active")
-    list_filter = ("role", "is_active", "is_staff")
+    list_display = (
+        "username",
+        "email",
+        "role",
+        "gender",
+        "current_academic",
+        "enrolled_status",
+        "created_by",
+        "is_active",
+    )
+    list_filter = ("role", "gender", "enrolled_status",
+                   "is_active", "is_staff")
     search_fields = ("username", "email", "first_name", "last_name")
+    fieldsets = (
+        (
+            None,
+            {
+                "fields": (
+                    "username",
+                    "password",
+                    "email",
+                    "first_name",
+                    "last_name",
+                    "role",
+                    "created_by",
+                )
+            },
+        ),
+        (
+            "Student Profile",
+            {
+                "fields": (
+                    "date_of_birth",
+                    "gender",
+                    "current_academic",
+                    "enrolled_status",
+                    "profile_photo",
+                )
+            },
+        ),
+        (
+            "Permissions",
+            {
+                "fields": (
+                    "is_active",
+                    "is_staff",
+                    "is_superuser",
+                    "groups",
+                    "user_permissions",
+                )
+            },
+        ),
+        ("Important dates", {"fields": ("last_login", "date_joined")}),
+    )
 
 
 @admin.register(Enrollment)

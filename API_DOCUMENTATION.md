@@ -57,7 +57,7 @@ Response:
 Use the `access` token in all subsequent requests:
 
 ```bash
-curl -H "Authorization: Bearer {access_token}" http://127.0.0.1:8000/api/users/me/
+curl -H "Authorization: Bearer {access_token}" http://127.0.0.1:8000/api/students/me/
 ```
 
 ### Refresh Token
@@ -76,11 +76,11 @@ Returns new `access` token.
 
 ---
 
-## User Management
+## Student Management
 
-### Get Current User Profile
+### Get Current Student Profile
 
-**Endpoint:** `GET /api/users/me/`  
+**Endpoint:** `GET /api/students/me/`  
 **Auth Required:** Yes  
 **Role:** Any authenticated user
 
@@ -99,7 +99,7 @@ Response:
 
 ### Public: Student Self-Registration
 
-**Endpoint:** `POST /api/users/register_student/`  
+**Endpoint:** `POST /api/students/register_student/`  
 **Auth Required:** No
 
 Request:
@@ -129,7 +129,7 @@ Response:
 
 ### Admin: Enroll New Teacher
 
-**Endpoint:** `POST /api/users/enroll_teacher/`  
+**Endpoint:** `POST /api/students/enroll_teacher/`  
 **Auth Required:** Yes  
 **Role:** Admin only
 
@@ -160,7 +160,7 @@ Response: (201 Created)
 
 ### Teacher: Enroll New Student
 
-**Endpoint:** `POST /api/users/enroll_student_by_teacher/`  
+**Endpoint:** `POST /api/students/enroll_student_by_teacher/`  
 **Auth Required:** Yes  
 **Role:** Teacher only
 

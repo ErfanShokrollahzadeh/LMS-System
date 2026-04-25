@@ -44,7 +44,7 @@ class JWTAuthenticationTests(TestCase):
 
     def test_protected_endpoint_without_token(self):
         """Test accessing protected endpoint without JWT token."""
-        response = self.client.get("/api/users/me/")
+        response = self.client.get("/api/students/me/")
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
 
     def test_protected_endpoint_with_valid_token(self):
@@ -59,7 +59,7 @@ class JWTAuthenticationTests(TestCase):
         )
         token = login_response.data["access"]
         self.client.credentials(HTTP_AUTHORIZATION=f"Bearer {token}")
-        response = self.client.get("/api/users/me/")
+        response = self.client.get("/api/students/me/")
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data["username"], "teacher_auth")
 
@@ -96,7 +96,7 @@ class UserViewSetTests(TestCase):
     def test_student_self_registration(self):
         """Test public student self-registration."""
         response = self.client.post(
-            "/api/users/register_student/",
+            "/api/students/register_student/",
             {
                 "username": "new_student",
                 "password": "StudentPass123!",
@@ -113,7 +113,7 @@ class UserViewSetTests(TestCase):
         """Test admin enrollment of new teacher."""
         self._auth_header(self.admin_token)
         response = self.client.post(
-            "/api/users/enroll_teacher/",
+            "/api/students/enroll_teacher/",
             {
                 "username": "new_teacher",
                 "password": "TeacherPass123!",
@@ -132,7 +132,7 @@ class UserViewSetTests(TestCase):
         """Test that non-admin users cannot enroll teachers."""
         self._auth_header(self.teacher_token)
         response = self.client.post(
-            "/api/users/enroll_teacher/",
+            "/api/students/enroll_teacher/",
             {
                 "username": "another_teacher",
                 "password": "Pass123!",
@@ -145,7 +145,7 @@ class UserViewSetTests(TestCase):
         """Test teacher enrollment of new student."""
         self._auth_header(self.teacher_token)
         response = self.client.post(
-            "/api/users/enroll_student_by_teacher/",
+            "/api/students/enroll_student_by_teacher/",
             {
                 "username": "new_student",
                 "password": "StudentPass123!",
