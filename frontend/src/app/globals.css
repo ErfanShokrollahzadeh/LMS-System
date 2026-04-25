@@ -1,0 +1,79 @@
+@import "tailwindcss";
+
+:root {
+  --background: #f3f7f3;
+  --surface: #ffffff;
+  --surface-muted: #eef3f0;
+  --foreground: #0f1f1b;
+  --text-soft: #4d625c;
+  --line: #d3dfd9;
+  --brand: #0b8a67;
+  --brand-strong: #07634a;
+  --brand-soft: #dff5ed;
+  --accent: #d67f2b;
+  --danger: #bc3b3b;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-sora);
+  --font-mono: var(--font-jetbrains-mono);
+}
+
+body {
+  background:
+    radial-gradient(circle at 0% 0%, rgba(11, 138, 103, 0.16), transparent 40%),
+    radial-gradient(
+      circle at 100% 0%,
+      rgba(214, 127, 43, 0.16),
+      transparent 35%
+    ),
+    linear-gradient(165deg, #f5faf7 0%, #edf4ef 40%, #f4f8f2 100%);
+  color: var(--foreground);
+  font-family: var(--font-sora), sans-serif;
+}
+
+.panel-shell {
+  width: min(1140px, calc(100% - 2rem));
+  margin: 1.5rem auto;
+  border: 1px solid var(--line);
+  border-radius: 24px;
+  overflow: hidden;
+  box-shadow: 0 24px 70px rgba(12, 37, 30, 0.14);
+  background: color-mix(in hsl, var(--surface) 88%, transparent);
+  backdrop-filter: blur(6px);
+  animation: rise-in 0.5s ease-out;
+}
+
+.card {
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  background: var(--surface);
+  box-shadow: 0 8px 22px rgba(15, 42, 35, 0.08);
+}
+
+.btn-primary {
+  background: linear-gradient(135deg, var(--brand), var(--brand-strong));
+  color: #fff;
+  border: none;
+}
+
+.btn-primary:hover {
+  filter: brightness(1.06);
+}
+
+.reveal {
+  animation: rise-in 0.45s ease-out both;
+}
+
+@keyframes rise-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}

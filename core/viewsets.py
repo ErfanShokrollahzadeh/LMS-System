@@ -43,6 +43,50 @@ class StudentViewSet(viewsets.ModelViewSet):
     serializer_class = UserSerializer
     permission_classes = [IsAuthenticated]
 
+    def get_serializer_class(self):
+        if self.action == "create":
+            return UserCreateSerializer
+        return UserSerializer
+
+    def _is_admin(self, user):
+        return user.role == User.IS_ADMIN or user.is_superuser
+
+    def _ensure_admin(self, request):
+        if not self._is_admin(request.user):
+            return Response(
+                {"detail": "Only managers can create, edit, or delete users."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+        return None
+
+    def create(self, request, *args, **kwargs):
+        denied = self._ensure_admin(request)
+        if denied:
+            return denied
+
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        user = serializer.save(created_by=request.user)
+        return Response(UserSerializer(user).data, status=status.HTTP_201_CREATED)
+
+    def update(self, request, *args, **kwargs):
+        denied = self._ensure_admin(request)
+        if denied:
+            return denied
+        return super().update(request, *args, **kwargs)
+
+    def partial_update(self, request, *args, **kwargs):
+        denied = self._ensure_admin(request)
+        if denied:
+            return denied
+        return super().partial_update(request, *args, **kwargs)
+
+    def destroy(self, request, *args, **kwargs):
+        denied = self._ensure_admin(request)
+        if denied:
+            return denied
+        return super().destroy(request, *args, **kwargs)
+
     @action(detail=False, methods=["get"])
     def me(self, request):
         """Get current authenticated student profile."""
