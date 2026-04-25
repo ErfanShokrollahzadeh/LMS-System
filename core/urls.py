@@ -23,6 +23,12 @@ urlpatterns = [
     path("auth/refresh", TokenRefreshView.as_view(),
          name="token_refresh_no_slash"),
     path("auth/refresh/", TokenRefreshView.as_view(), name="token_refresh"),
+    # Profile endpoint without trailing slash (avoids redirect dropping auth in some clients)
+    path(
+        "students/me",
+        StudentViewSet.as_view({"get": "me"}),
+        name="student_me_no_slash",
+    ),
     # API endpoints
     path("", include(router.urls)),
 ]
