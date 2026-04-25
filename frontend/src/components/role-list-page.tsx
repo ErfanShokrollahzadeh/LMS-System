@@ -4,8 +4,9 @@ import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Pencil, Plus, Trash2, X } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
-import { createUser, deleteUser, getUsersByRole, toPhotoUrl, updateUser } from "@/lib/api";
-import { getAccessToken } from "@/lib/session";
+import { canAccessSection } from "@/lib/access";
+import { ApiError, createUser, deleteUser, getMyProfile, getUsersByRole, toPhotoUrl, updateUser } from "@/lib/api";
+import { clearSession, getAccessToken, saveRole } from "@/lib/session";
 import type { UserCreateInput, UserProfile, UserRole } from "@/lib/types";
 
 interface RoleListPageProps {
@@ -20,6 +21,7 @@ export function RoleListPage({ role, title, subtitle }: RoleListPageProps) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const [viewerRole, setViewerRole] = useState<UserRole | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [photoFile, setPhotoFile] = useState<File | null>(null);
@@ -43,6 +45,15 @@ export function RoleListPage({ role, title, subtitle }: RoleListPageProps) {
     }
     return role;
   }, [role]);
+
+  const section = useMemo(() => {
+    if (role === "admin") {
+      return "admin" as const;
+    }
+    return role;
+  }, [role]);
+
+  const canMutate = viewerRole === "admin";
 
   const openCreateModal = () => {
     setEditingId(null);
@@ -95,15 +106,32 @@ export function RoleListPage({ role, title, subtitle }: RoleListPageProps) {
     }
 
     try {
+      const profile = await getMyProfile(token);
+      setViewerRole(profile.role);
+      saveRole(profile.role);
+
+      if (!canAccessSection(profile.role, section)) {
+        clearSession();
+        router.replace("/login");
+        setLoading(false);
+        return;
+      }
+
       const result = await getUsersByRole(token, role);
       setUsers(result);
     } catch (err) {
+      if (err instanceof ApiError && err.status === 401) {
+        clearSession();
+        router.push("/login");
+        return;
+      }
+
       const message = err instanceof Error ? err.message : "Failed to load users";
       setError(message);
     } finally {
       setLoading(false);
     }
-  }, [role, router]);
+  }, [role, router, section]);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -115,6 +143,11 @@ export function RoleListPage({ role, title, subtitle }: RoleListPageProps) {
     const token = getAccessToken();
     if (!token) {
       router.push("/login");
+      return;
+    }
+
+    if (!canMutate) {
+      setError("Only managers can create or edit users.");
       return;
     }
 
@@ -157,6 +190,12 @@ export function RoleListPage({ role, title, subtitle }: RoleListPageProps) {
       setLoading(true);
       await loadUsers();
     } catch (err) {
+      if (err instanceof ApiError && err.status === 401) {
+        clearSession();
+        router.push("/login");
+        return;
+      }
+
       const message = err instanceof Error ? err.message : "Save failed";
       setError(message);
     } finally {
@@ -170,6 +209,11 @@ export function RoleListPage({ role, title, subtitle }: RoleListPageProps) {
       router.push("/login");
       return;
     }
+
+    if (!canMutate) {
+      setError("Only managers can delete users.");
+      return;
+    }
     const confirmed = window.confirm("Delete this record?");
     if (!confirmed) {
       return;
@@ -181,6 +225,12 @@ export function RoleListPage({ role, title, subtitle }: RoleListPageProps) {
       await deleteUser(token, id);
       setUsers((prev) => prev.filter((item) => item.id !== id));
     } catch (err) {
+      if (err instanceof ApiError && err.status === 401) {
+        clearSession();
+        router.push("/login");
+        return;
+      }
+
       const message = err instanceof Error ? err.message : "Delete failed";
       setError(message);
     } finally {
@@ -189,17 +239,19 @@ export function RoleListPage({ role, title, subtitle }: RoleListPageProps) {
   };
 
   return (
-    <AppShell title={title} subtitle={subtitle}>
-      <div className="mb-4 flex justify-end">
-        <button
-          type="button"
-          onClick={openCreateModal}
-          className="btn-primary inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold"
-        >
-          <Plus size={16} />
-          Create {roleName}
-        </button>
-      </div>
+    <AppShell title={title} subtitle={subtitle} currentRole={viewerRole}>
+      {canMutate && (
+        <div className="mb-4 flex justify-end">
+          <button
+            type="button"
+            onClick={openCreateModal}
+            className="btn-primary inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold"
+          >
+            <Plus size={16} />
+            Create {roleName}
+          </button>
+        </div>
+      )}
 
       {loading && <div className="card p-6 text-(--text-soft)">Loading data...</div>}
       {!loading && error && (
@@ -267,21 +319,25 @@ export function RoleListPage({ role, title, subtitle }: RoleListPageProps) {
                 </dl>
 
                 <div className="flex gap-2 pt-1">
-                  <button
-                    type="button"
-                    onClick={() => openEditModal(user)}
-                    className="inline-flex items-center gap-1 rounded-lg border border-(--line) bg-(--surface) px-3 py-1.5 text-sm font-medium transition hover:bg-(--surface-muted)"
-                  >
-                    <Pencil size={14} /> Edit
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => onDelete(user.id)}
-                    disabled={busy}
-                    className="inline-flex items-center gap-1 rounded-lg border border-red-200 bg-red-50 px-3 py-1.5 text-sm font-medium text-red-700 transition hover:bg-red-100 disabled:opacity-60"
-                  >
-                    <Trash2 size={14} /> Delete
-                  </button>
+                  {canMutate && (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => openEditModal(user)}
+                        className="inline-flex items-center gap-1 rounded-lg border border-(--line) bg-(--surface) px-3 py-1.5 text-sm font-medium transition hover:bg-(--surface-muted)"
+                      >
+                        <Pencil size={14} /> Edit
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => onDelete(user.id)}
+                        disabled={busy}
+                        className="inline-flex items-center gap-1 rounded-lg border border-red-200 bg-red-50 px-3 py-1.5 text-sm font-medium text-red-700 transition hover:bg-red-100 disabled:opacity-60"
+                      >
+                        <Trash2 size={14} /> Delete
+                      </button>
+                    </>
+                  )}
                 </div>
               </article>
             );

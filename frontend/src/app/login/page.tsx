@@ -4,7 +4,7 @@ import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
 import { KeyRound, UserRound } from "lucide-react";
 import { getMyProfile, login } from "@/lib/api";
-import { saveSession } from "@/lib/session";
+import { saveRole, saveSession } from "@/lib/session";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -22,6 +22,7 @@ export default function LoginPage() {
       const tokens = await login(username, password);
       saveSession(tokens);
       const profile = await getMyProfile(tokens.access);
+      saveRole(profile.role);
       if (profile.role === "student") {
         router.push("/student/list");
       } else if (profile.role === "teacher") {

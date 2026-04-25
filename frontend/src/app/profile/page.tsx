@@ -4,8 +4,8 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { CalendarDays, Mail, UserCircle2 } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
-import { getMyProfile, toPhotoUrl } from "@/lib/api";
-import { getAccessToken } from "@/lib/session";
+import { ApiError, getMyProfile, toPhotoUrl } from "@/lib/api";
+import { clearSession, getAccessToken, saveRole } from "@/lib/session";
 import type { UserProfile } from "@/lib/types";
 
 export default function ProfilePage() {
@@ -22,8 +22,18 @@ export default function ProfilePage() {
     }
 
     getMyProfile(token)
-      .then((result) => setProfile(result))
-      .catch((err: Error) => setError(err.message))
+      .then((result) => {
+        setProfile(result);
+        saveRole(result.role);
+      })
+      .catch((err: Error) => {
+        if (err instanceof ApiError && err.status === 401) {
+          clearSession();
+          router.push("/login");
+          return;
+        }
+        setError(err.message);
+      })
       .finally(() => setLoading(false));
   }, [router]);
 
@@ -31,6 +41,7 @@ export default function ProfilePage() {
     <AppShell
       title="My Profile"
       subtitle="Your account details loaded from Django database through API."
+      currentRole={profile?.role}
     >
       {loading && <div className="card p-6 text-(--text-soft)">Loading profile...</div>}
       {!loading && error && (

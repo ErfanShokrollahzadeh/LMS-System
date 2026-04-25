@@ -3,7 +3,9 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { CircleUserRound, GraduationCap, LogOut, Shield, UsersRound } from "lucide-react";
+import { canAccessSection } from "@/lib/access";
 import { clearSession } from "@/lib/session";
+import type { UserRole } from "@/lib/types";
 
 const navItems = [
   { href: "/student/list", label: "Students", icon: GraduationCap },
@@ -15,10 +17,11 @@ const navItems = [
 interface AppShellProps {
   title: string;
   subtitle: string;
+  currentRole?: UserRole | null;
   children: React.ReactNode;
 }
 
-export function AppShell({ title, subtitle, children }: AppShellProps) {
+export function AppShell({ title, subtitle, currentRole, children }: AppShellProps) {
   const pathname = usePathname();
   const router = useRouter();
 
@@ -26,6 +29,22 @@ export function AppShell({ title, subtitle, children }: AppShellProps) {
     clearSession();
     router.push("/login");
   };
+
+  const filteredNavItems = navItems.filter((item) => {
+    if (!currentRole) {
+      return true;
+    }
+    if (item.href.startsWith("/manager")) {
+      return canAccessSection(currentRole, "admin");
+    }
+    if (item.href.startsWith("/teacher")) {
+      return canAccessSection(currentRole, "teacher");
+    }
+    if (item.href.startsWith("/student")) {
+      return canAccessSection(currentRole, "student");
+    }
+    return true;
+  });
 
   return (
     <div className="panel-shell grid min-h-[calc(100vh-3rem)] grid-cols-1 lg:grid-cols-[260px_1fr]">
@@ -35,7 +54,7 @@ export function AppShell({ title, subtitle, children }: AppShellProps) {
           <h1 className="mt-2 text-2xl font-bold">Control Panel</h1>
         </div>
         <nav className="space-y-2">
-          {navItems.map(({ href, label, icon: Icon }) => {
+          {filteredNavItems.map(({ href, label, icon: Icon }) => {
             const active = pathname === href;
             return (
               <Link

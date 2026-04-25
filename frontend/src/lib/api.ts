@@ -12,11 +12,21 @@ type PaginatedResponse<T> = {
   results: T[];
 };
 
+export class ApiError extends Error {
+  status: number;
+
+  constructor(message: string, status: number) {
+    super(message);
+    this.name = "ApiError";
+    this.status = status;
+  }
+}
+
 async function parseJson(response: Response) {
   const body = await response.json().catch(() => ({}));
   if (!response.ok) {
     const message = body?.detail || body?.message || "Request failed";
-    throw new Error(message);
+    throw new ApiError(message, response.status);
   }
   return body;
 }

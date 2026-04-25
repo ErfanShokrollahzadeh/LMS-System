@@ -1,7 +1,23 @@
+"use client";
+
 import Link from "next/link";
+import { useState } from "react";
 import { ArrowRight, Building2, GraduationCap, ShieldCheck } from "lucide-react";
+import { getSavedRole } from "@/lib/session";
+import type { UserRole } from "@/lib/types";
 
 export default function Home() {
+  const [role] = useState<UserRole | null>(() => {
+    const saved = getSavedRole();
+    if (saved === "admin" || saved === "teacher" || saved === "student") {
+      return saved;
+    }
+    return null;
+  });
+
+  const showTeacher = role !== "student";
+  const showManager = role !== "teacher" && role !== "student";
+
   return (
     <main className="mx-auto flex min-h-screen w-full max-w-6xl items-center px-5 py-10">
       <section className="panel-shell grid w-full gap-8 bg-white/85 p-8 md:grid-cols-[1.2fr_1fr] md:p-12">
@@ -38,14 +54,18 @@ export default function Home() {
               <GraduationCap size={20} className="text-(--brand)" />
               <span className="font-medium">Student List</span>
             </Link>
-            <Link href="/teacher/list" className="card flex items-center gap-3 p-4 transition hover:-translate-y-0.5">
-              <Building2 size={20} className="text-(--accent)" />
-              <span className="font-medium">Teacher List</span>
-            </Link>
-            <Link href="/manager/list" className="card flex items-center gap-3 p-4 transition hover:-translate-y-0.5">
-              <ShieldCheck size={20} className="text-(--brand-strong)" />
-              <span className="font-medium">Manager List</span>
-            </Link>
+            {showTeacher && (
+              <Link href="/teacher/list" className="card flex items-center gap-3 p-4 transition hover:-translate-y-0.5">
+                <Building2 size={20} className="text-(--accent)" />
+                <span className="font-medium">Teacher List</span>
+              </Link>
+            )}
+            {showManager && (
+              <Link href="/manager/list" className="card flex items-center gap-3 p-4 transition hover:-translate-y-0.5">
+                <ShieldCheck size={20} className="text-(--brand-strong)" />
+                <span className="font-medium">Manager List</span>
+              </Link>
+            )}
           </div>
         </div>
       </section>
