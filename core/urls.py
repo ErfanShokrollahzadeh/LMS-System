@@ -16,8 +16,12 @@ router.register(r"tasks", TaskViewSet, basename="task")
 
 urlpatterns = [
     # JWT Authentication
+    path("auth/login", CustomTokenObtainPairView.as_view(),
+         name="token_obtain_pair_no_slash"),
     path("auth/login/", CustomTokenObtainPairView.as_view(),
          name="token_obtain_pair"),
+    path("auth/refresh", TokenRefreshView.as_view(),
+         name="token_refresh_no_slash"),
     path("auth/refresh/", TokenRefreshView.as_view(), name="token_refresh"),
     # API endpoints
     path("", include(router.urls)),

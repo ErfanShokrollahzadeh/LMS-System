@@ -1,6 +1,8 @@
 # superuser username and pass : erfan8080 and admin1234
 
 from django.contrib import admin
+from django.contrib.auth.admin import UserAdmin as DjangoUserAdmin
+from django.contrib.auth.forms import UserChangeForm, UserCreationForm
 
 from .models import Enrollment, Task, User
 
@@ -8,8 +10,46 @@ User._meta.verbose_name = "Student"
 User._meta.verbose_name_plural = "Students"
 
 
+class CustomUserCreationForm(UserCreationForm):
+    class Meta(UserCreationForm.Meta):
+        model = User
+        fields = (
+            "username",
+            "email",
+            "first_name",
+            "last_name",
+            "role",
+            "is_active",
+            "is_staff",
+        )
+
+
+class CustomUserChangeForm(UserChangeForm):
+    class Meta(UserChangeForm.Meta):
+        model = User
+        fields = (
+            "username",
+            "email",
+            "first_name",
+            "last_name",
+            "role",
+            "date_of_birth",
+            "gender",
+            "current_academic",
+            "enrolled_status",
+            "profile_photo",
+            "is_active",
+            "is_staff",
+            "is_superuser",
+            "groups",
+            "user_permissions",
+        )
+
+
 @admin.register(User)
-class UserAdmin(admin.ModelAdmin):
+class UserAdmin(DjangoUserAdmin):
+    add_form = CustomUserCreationForm
+    form = CustomUserChangeForm
     list_display = (
         "username",
         "email",
@@ -63,6 +103,25 @@ class UserAdmin(admin.ModelAdmin):
             },
         ),
         ("Important dates", {"fields": ("last_login", "date_joined")}),
+    )
+    add_fieldsets = (
+        (
+            None,
+            {
+                "classes": ("wide",),
+                "fields": (
+                    "username",
+                    "email",
+                    "first_name",
+                    "last_name",
+                    "role",
+                    "password1",
+                    "password2",
+                    "is_active",
+                    "is_staff",
+                ),
+            },
+        ),
     )
 
 
