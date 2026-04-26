@@ -20,6 +20,7 @@ export function RoleListPage({ role, title, subtitle }: RoleListPageProps) {
   const [users, setUsers] = useState<UserProfile[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [successMessage, setSuccessMessage] = useState("");
   const [busy, setBusy] = useState(false);
   const [viewerRole, setViewerRole] = useState<UserRole | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -70,6 +71,7 @@ export function RoleListPage({ role, title, subtitle }: RoleListPageProps) {
       enrolled_status: true,
     });
     setError("");
+    setSuccessMessage("");
     setIsModalOpen(true);
   };
 
@@ -88,6 +90,7 @@ export function RoleListPage({ role, title, subtitle }: RoleListPageProps) {
       enrolled_status: user.enrolled_status,
     });
     setError("");
+    setSuccessMessage("");
     setIsModalOpen(true);
   };
 
@@ -153,6 +156,7 @@ export function RoleListPage({ role, title, subtitle }: RoleListPageProps) {
 
     setBusy(true);
     setError("");
+    setSuccessMessage("");
 
     try {
       if (isEditing && editingId !== null) {
@@ -189,6 +193,7 @@ export function RoleListPage({ role, title, subtitle }: RoleListPageProps) {
       setIsModalOpen(false);
       setLoading(true);
       await loadUsers();
+      setSuccessMessage(isEditing ? `${roleName} updated and saved to database.` : `${roleName} created and saved to database.`);
     } catch (err) {
       if (err instanceof ApiError && err.status === 401) {
         clearSession();
@@ -221,9 +226,11 @@ export function RoleListPage({ role, title, subtitle }: RoleListPageProps) {
 
     setBusy(true);
     setError("");
+    setSuccessMessage("");
     try {
       await deleteUser(token, id);
       setUsers((prev) => prev.filter((item) => item.id !== id));
+      setSuccessMessage(`${roleName} deleted from database.`);
     } catch (err) {
       if (err instanceof ApiError && err.status === 401) {
         clearSession();
@@ -251,6 +258,10 @@ export function RoleListPage({ role, title, subtitle }: RoleListPageProps) {
             Create {roleName}
           </button>
         </div>
+      )}
+
+      {!loading && successMessage && (
+        <div className="card mb-4 border-emerald-200 bg-emerald-50 p-4 text-emerald-800">{successMessage}</div>
       )}
 
       {loading && <div className="card p-6 text-(--text-soft)">Loading data...</div>}
@@ -307,11 +318,10 @@ export function RoleListPage({ role, title, subtitle }: RoleListPageProps) {
                   <div className="flex justify-between gap-3">
                     <dt className="text-(--text-soft)">Status</dt>
                     <dd
-                      className={`rounded-full px-2 py-0.5 text-xs font-semibold ${
-                        user.enrolled_status
-                          ? "bg-emerald-100 text-emerald-800"
-                          : "bg-red-100 text-red-800"
-                      }`}
+                      className={`rounded-full px-2 py-0.5 text-xs font-semibold ${user.enrolled_status
+                        ? "bg-emerald-100 text-emerald-800"
+                        : "bg-red-100 text-red-800"
+                        }`}
                     >
                       {user.enrolled_status ? "Enrolled" : "Not Enrolled"}
                     </dd>
@@ -357,6 +367,12 @@ export function RoleListPage({ role, title, subtitle }: RoleListPageProps) {
                 <X size={18} />
               </button>
             </div>
+
+            {error && (
+              <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-(--danger)">
+                {error}
+              </div>
+            )}
 
             <form onSubmit={onSave} className="grid gap-3 sm:grid-cols-2">
               <label className="text-sm font-medium">

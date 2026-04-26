@@ -6,7 +6,9 @@ import type {
   UserUpdateInput,
 } from "@/lib/types";
 
-const API_PREFIX = "/backend";
+const API_PREFIX = process.env.NEXT_PUBLIC_API_PREFIX || "/backend";
+const DIRECT_BACKEND_URL =
+  process.env.NEXT_PUBLIC_DJANGO_BACKEND_URL || process.env.DJANGO_BACKEND_URL || "http://127.0.0.1:8000";
 
 type PaginatedResponse<T> = {
   results: T[];
@@ -22,10 +24,72 @@ export class ApiError extends Error {
   }
 }
 
+function isAbsoluteUrl(url: string) {
+  return /^https?:\/\//i.test(url);
+}
+
+function apiUrl(path: string) {
+  if (isAbsoluteUrl(API_PREFIX)) {
+    const normalizedBase = API_PREFIX.endsWith("/")
+      ? API_PREFIX.slice(0, -1)
+      : API_PREFIX;
+    const normalizedPath = path.startsWith("/") ? path : `/${path}`;
+    return `${normalizedBase}${normalizedPath}`;
+  }
+  return `${API_PREFIX}${path}`;
+}
+
+function directApiUrl(path: string) {
+  const normalizedBase = DIRECT_BACKEND_URL.endsWith("/")
+    ? DIRECT_BACKEND_URL.slice(0, -1)
+    : DIRECT_BACKEND_URL;
+  const normalizedPath = path.startsWith("/") ? path : `/${path}`;
+  return `${normalizedBase}${normalizedPath}`;
+}
+
+async function apiFetch(path: string, init?: RequestInit) {
+  try {
+    return await fetch(apiUrl(path), init);
+  } catch {
+    if (!isAbsoluteUrl(API_PREFIX)) {
+      try {
+        return await fetch(directApiUrl(path), init);
+      } catch {
+        // Fall through to final connectivity error.
+      }
+    }
+
+    throw new ApiError(
+      `Unable to reach backend API. Tried ${apiUrl(path)}${!isAbsoluteUrl(API_PREFIX) ? ` and ${directApiUrl(path)}` : ""}. Make sure the backend is running, or set NEXT_PUBLIC_API_PREFIX / NEXT_PUBLIC_DJANGO_BACKEND_URL correctly.`,
+      0
+    );
+  }
+}
+
 async function parseJson(response: Response) {
-  const body = await response.json().catch(() => ({}));
+  const body = await response.json().catch(async () => {
+    const text = await response.text().catch(() => "");
+    return { message: text || response.statusText };
+  });
   if (!response.ok) {
-    const message = body?.detail || body?.message || "Request failed";
+    const message =
+      body?.detail ||
+      body?.message ||
+      (typeof body === "object" && body !== null
+        ? Object.entries(body)
+            .map(([field, value]) => {
+              if (Array.isArray(value)) {
+                return `${field}: ${value.join(", ")}`;
+              }
+              if (typeof value === "string") {
+                return `${field}: ${value}`;
+              }
+              return null;
+            })
+            .filter(Boolean)
+            .join(" | ")
+        : "") ||
+      "Request failed";
     throw new ApiError(message, response.status);
   }
   return body;
@@ -45,14 +109,11 @@ export function toPhotoUrl(path: string | null) {
   if (path.startsWith("http")) {
     return path;
   }
-  if (path.startsWith("/")) {
-    return `${API_PREFIX}${path}`;
-  }
-  return `${API_PREFIX}/${path}`;
+  return apiUrl(path.startsWith("/") ? path : `/${path}`);
 }
 
 export async function login(username: string, password: string): Promise<TokenPair> {
-  const response = await fetch(`${API_PREFIX}/api/auth/login/`, {
+  const response = await apiFetch("/api/auth/login/", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -64,7 +125,7 @@ export async function login(username: string, password: string): Promise<TokenPa
 }
 
 export async function getMyProfile(token: string): Promise<UserProfile> {
-  const response = await fetch(`${API_PREFIX}/api/students/me/`, {
+  const response = await apiFetch("/api/students/me/", {
     headers: {
       Authorization: `Bearer ${token}`,
     },
@@ -74,7 +135,7 @@ export async function getMyProfile(token: string): Promise<UserProfile> {
 }
 
 export async function getUsers(token: string): Promise<UserProfile[]> {
-  const response = await fetch(`${API_PREFIX}/api/students/`, {
+  const response = await apiFetch("/api/students/", {
     headers: {
       Authorization: `Bearer ${token}`,
     },
@@ -111,7 +172,7 @@ export async function createUser(token: string, payload: UserCreateInput): Promi
   appendCommonUserFields(formData, payload);
   formData.append("password", payload.password);
 
-  const response = await fetch(`${API_PREFIX}/api/students/`, {
+  const response = await apiFetch("/api/students/", {
     method: "POST",
     headers: {
       Authorization: `Bearer ${token}`,
@@ -126,7 +187,7 @@ export async function updateUser(token: string, payload: UserUpdateInput): Promi
   const formData = new FormData();
   appendCommonUserFields(formData, payload);
 
-  const response = await fetch(`${API_PREFIX}/api/students/${payload.id}/`, {
+  const response = await apiFetch(`/api/students/${payload.id}/`, {
     method: "PATCH",
     headers: {
       Authorization: `Bearer ${token}`,
@@ -138,7 +199,7 @@ export async function updateUser(token: string, payload: UserUpdateInput): Promi
 }
 
 export async function deleteUser(token: string, id: number): Promise<void> {
-  const response = await fetch(`${API_PREFIX}/api/students/${id}/`, {
+  const response = await apiFetch(`/api/students/${id}/`, {
     method: "DELETE",
     headers: {
       Authorization: `Bearer ${token}`,

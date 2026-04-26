@@ -1,3 +1,6 @@
+import logging
+
+from django.db import IntegrityError
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated, AllowAny
@@ -17,6 +20,7 @@ from .serializers import (
 )
 
 User = get_user_model()
+logger = logging.getLogger(__name__)
 
 
 class CustomTokenObtainPairView(TokenObtainPairView):
@@ -66,7 +70,19 @@ class StudentViewSet(viewsets.ModelViewSet):
 
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        user = serializer.save(created_by=request.user)
+        try:
+            user = serializer.save(created_by=request.user)
+        except IntegrityError:
+            return Response(
+                {"detail": "Unable to save user due to duplicate or invalid database values."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        except Exception:
+            logger.exception("Unexpected error while creating user")
+            return Response(
+                {"detail": "Unexpected error while creating user."},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
         return Response(UserSerializer(user).data, status=status.HTTP_201_CREATED)
 
     def update(self, request, *args, **kwargs):
@@ -137,7 +153,19 @@ class StudentViewSet(viewsets.ModelViewSet):
         data["role"] = User.IS_TEACHER
         serializer = UserCreateSerializer(data=data)
         if serializer.is_valid():
-            user = serializer.save(created_by=request.user)
+            try:
+                user = serializer.save(created_by=request.user)
+            except IntegrityError:
+                return Response(
+                    {"detail": "Unable to save teacher due to duplicate or invalid database values."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            except Exception:
+                logger.exception("Unexpected error while enrolling teacher")
+                return Response(
+                    {"detail": "Unexpected error while enrolling teacher."},
+                    status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                )
             return Response(
                 UserSerializer(user).data, status=status.HTTP_201_CREATED
             )
@@ -166,7 +194,19 @@ class StudentViewSet(viewsets.ModelViewSet):
         data["role"] = User.IS_STUDENT
         serializer = UserCreateSerializer(data=data)
         if serializer.is_valid():
-            student = serializer.save(created_by=request.user)
+            try:
+                student = serializer.save(created_by=request.user)
+            except IntegrityError:
+                return Response(
+                    {"detail": "Unable to save student due to duplicate or invalid database values."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            except Exception:
+                logger.exception("Unexpected error while enrolling student")
+                return Response(
+                    {"detail": "Unexpected error while enrolling student."},
+                    status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                )
             enrollment = Enrollment.objects.create(
                 teacher=request.user, student=student
             )

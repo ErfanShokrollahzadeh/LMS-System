@@ -20,13 +20,27 @@ python3 -m pip install -r requirements.txt
 python3 manage.py runserver
 ```
 
-4. (Optional) if your backend is not running on `http://127.0.0.1:8000`, set a custom backend URL when starting the frontend:
+4. (Optional) if your backend is not running on `http://127.0.0.1:8000`, set a custom backend URL for the Next.js rewrite proxy:
 
 ```bash
 DJANGO_BACKEND_URL=http://127.0.0.1:8001 npm run dev
 ```
 
-5. Otherwise, run the frontend development server:
+5. (Optional) if you want the browser to call the backend directly (instead of using the Next.js `/backend` proxy), set:
+
+```bash
+NEXT_PUBLIC_API_PREFIX=http://127.0.0.1:8000 npm run dev
+```
+
+This is useful if you see connectivity errors such as `ECONNREFUSED` from the proxy path.
+
+Alternative direct-backend env (used as automatic fallback when `/backend` is unreachable):
+
+```bash
+NEXT_PUBLIC_DJANGO_BACKEND_URL=http://127.0.0.1:8000 npm run dev
+```
+
+6. Otherwise, run the frontend development server:
 
 ```bash
 npm run dev
