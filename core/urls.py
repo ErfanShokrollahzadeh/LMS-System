@@ -29,6 +29,36 @@ urlpatterns = [
         StudentViewSet.as_view({"get": "me"}),
         name="student_me_no_slash",
     ),
+    path(
+        "students/me/",
+        StudentViewSet.as_view({"get": "me"}),
+        name="student_me",
+    ),
+    # Accept detail routes without trailing slash to avoid DELETE redirect/runtime issues.
+    path(
+        "students/<int:pk>",
+        StudentViewSet.as_view(
+            {
+                "get": "retrieve",
+                "patch": "partial_update",
+                "put": "update",
+                "delete": "destroy",
+            }
+        ),
+        name="student_detail_no_slash",
+    ),
+    path(
+        "students/<int:pk>/",
+        StudentViewSet.as_view(
+            {
+                "get": "retrieve",
+                "patch": "partial_update",
+                "put": "update",
+                "delete": "destroy",
+            }
+        ),
+        name="student_detail",
+    ),
     # API endpoints
     path("", include(router.urls)),
 ]
