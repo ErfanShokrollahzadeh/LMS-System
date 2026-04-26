@@ -1,8 +1,12 @@
 import type { NextConfig } from "next";
 
-const backendBaseUrl = (
+function normalizeBackendBaseUrl(url: string) {
+  return url.endsWith("/") ? url.slice(0, -1) : url;
+}
+
+const backendBaseUrl = normalizeBackendBaseUrl(
   process.env.DJANGO_BACKEND_URL ?? "http://127.0.0.1:8000"
-).replace(/\/$/, "");
+);
 
 const nextConfig: NextConfig = {
   async rewrites() {

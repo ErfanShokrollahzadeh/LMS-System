@@ -32,6 +32,8 @@ ALLOWED_HOSTS = []
 
 # Application definition
 
+HAS_CORSHEADERS = importlib.util.find_spec("corsheaders") is not None
+
 INSTALLED_APPS = [
     "django.contrib.admin",
     "django.contrib.auth",
@@ -39,6 +41,7 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
+    *(["corsheaders"] if HAS_CORSHEADERS else []),
     "rest_framework",
     "rest_framework_simplejwt",
     "core",
@@ -47,16 +50,13 @@ INSTALLED_APPS = [
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
+    *(["corsheaders.middleware.CorsMiddleware"] if HAS_CORSHEADERS else []),
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
-
-if importlib.util.find_spec("corsheaders"):
-    INSTALLED_APPS.append("corsheaders")
-    MIDDLEWARE.insert(2, "corsheaders.middleware.CorsMiddleware")
 
 ROOT_URLCONF = "aims_college.urls"
 

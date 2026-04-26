@@ -20,13 +20,13 @@ python3 -m pip install -r requirements.txt
 python3 manage.py runserver
 ```
 
-4. (Optional) if your backend is not running on `http://127.0.0.1:8000`, set a custom backend URL:
+4. (Optional) if your backend is not running on `http://127.0.0.1:8000`, set a custom backend URL when starting the frontend:
 
 ```bash
-DJANGO_BACKEND_URL=http://127.0.0.1:8001
+DJANGO_BACKEND_URL=http://127.0.0.1:8001 npm run dev
 ```
 
-5. Run the frontend development server:
+5. Otherwise, run the frontend development server:
 
 ```bash
 npm run dev
