@@ -84,7 +84,9 @@ export async function getUsers(token: string): Promise<UserProfile[]> {
   return toList<UserProfile>(payload);
 }
 
-export async function getUsersByRole(token: string, role: UserRole) {
+export async function getUsersByRole(token: string, role: UserRole): Promise<UserProfile[]> {
+  // Fetch all users and filter by role on the client
+  // The /api/students/ endpoint returns all users regardless of role
   const users = await getUsers(token);
   return users.filter((item) => item.role === role);
 }

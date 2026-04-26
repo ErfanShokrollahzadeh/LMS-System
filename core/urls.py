@@ -9,7 +9,7 @@ from .viewsets import (
     CustomTokenObtainPairView,
 )
 
-router = DefaultRouter()
+router = DefaultRouter(trailing_slash="/?")
 router.register(r"students", StudentViewSet, basename="student")
 router.register(r"enrollments", EnrollmentViewSet, basename="enrollment")
 router.register(r"tasks", TaskViewSet, basename="task")
