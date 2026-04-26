@@ -1,0 +1,127 @@
+Watching for file changes with StatReloader
+Method Not Allowed: /api/auth/login/
+[26/Apr/2026 13:25:44] "GET /api/auth/login/ HTTP/1.1" 405 40
+Unauthorized: /api/students/me/
+[26/Apr/2026 13:26:16] "GET /api/students/me/ HTTP/1.1" 401 58
+[26/Apr/2026 13:26:24] "OPTIONS /api/students/ HTTP/1.1" 200 0
+[26/Apr/2026 13:28:16] "GET /api/health/ HTTP/1.1" 200 5460
+Not Found: /favicon.ico
+[26/Apr/2026 13:28:20] "GET /favicon.ico HTTP/1.1" 404 3757
+[26/Apr/2026 13:28:20] "GET /admin/core/user/ HTTP/1.1" 200 16010
+[26/Apr/2026 13:28:20] "GET /admin/jsi18n/ HTTP/1.1" 200 3342
+[26/Apr/2026 13:28:32] "GET /api/students/me HTTP/1.1" 200 256
+Internal Server Error: /api/students
+Traceback (most recent call last):
+  File "/Library/Frameworks/Python.framework/Versions/3.14/lib/python3.14/site-packages/django/core/handlers/exception.py", line 55, in inner
+    response = get_response(request)
+  File "/Library/Frameworks/Python.framework/Versions/3.14/lib/python3.14/site-packages/django/utils/deprecation.py", line 122, in __call__
+    response = self.process_response(request, response)
+  File "/Library/Frameworks/Python.framework/Versions/3.14/lib/python3.14/site-packages/django/middleware/common.py", line 108, in process_response
+    return self.response_redirect_class(self.get_full_path_with_slash(request))
+                                        ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^
+  File "/Library/Frameworks/Python.framework/Versions/3.14/lib/python3.14/site-packages/django/middleware/common.py", line 87, in get_full_path_with_slash
+    raise RuntimeError(
+    ...<9 lines>...
+    )
+RuntimeError: You called this URL via POST, but the URL doesn't end in a slash and you have APPEND_SLASH set. Django can't redirect to the slash URL while maintaining POST data. Change your form to point to 127.0.0.1:8000/api/students/ (note the trailing slash), or set APPEND_SLASH=False in your Django settings.
+[26/Apr/2026 13:29:51] "POST /api/students HTTP/1.1" 500 72200
+Internal Server Error: /api/students
+Traceback (most recent call last):
+  File "/Library/Frameworks/Python.framework/Versions/3.14/lib/python3.14/site-packages/django/core/handlers/exception.py", line 55, in inner
+    response = get_response(request)
+  File "/Library/Frameworks/Python.framework/Versions/3.14/lib/python3.14/site-packages/django/utils/deprecation.py", line 122, in __call__
+    response = self.process_response(request, response)
+  File "/Library/Frameworks/Python.framework/Versions/3.14/lib/python3.14/site-packages/django/middleware/common.py", line 108, in process_response
+    return self.response_redirect_class(self.get_full_path_with_slash(request))
+                                        ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^
+  File "/Library/Frameworks/Python.framework/Versions/3.14/lib/python3.14/site-packages/django/middleware/common.py", line 87, in get_full_path_with_slash
+    raise RuntimeError(
+    ...<9 lines>...
+    )
+RuntimeError: You called this URL via POST, but the URL doesn't end in a slash and you have APPEND_SLASH set. Django can't redirect to the slash URL while maintaining POST data. Change your form to point to 127.0.0.1:8000/api/students/ (note the trailing slash), or set APPEND_SLASH=False in your Django settings.
+[26/Apr/2026 13:30:15] "POST /api/students HTTP/1.1" 500 72200
+Internal Server Error: /api/students
+Traceback (most recent call last):
+  File "/Library/Frameworks/Python.framework/Versions/3.14/lib/python3.14/site-packages/django/core/handlers/exception.py", line 55, in inner
+    response = get_response(request)
+  File "/Library/Frameworks/Python.framework/Versions/3.14/lib/python3.14/site-packages/django/utils/deprecation.py", line 122, in __call__
+    response = self.process_response(request, response)
+  File "/Library/Frameworks/Python.framework/Versions/3.14/lib/python3.14/site-packages/django/middleware/common.py", line 108, in process_response
+    return self.response_redirect_class(self.get_full_path_with_slash(request))
+                                        ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^
+  File "/Library/Frameworks/Python.framework/Versions/3.14/lib/python3.14/site-packages/django/middleware/common.py", line 87, in get_full_path_with_slash
+    raise RuntimeError(
+    ...<9 lines>...
+    )
+RuntimeError: You called this URL via POST, but the URL doesn't end in a slash and you have APPEND_SLASH set. Django can't redirect to the slash URL while maintaining POST data. Change your form to point to 127.0.0.1:8000/api/students/ (note the trailing slash), or set APPEND_SLASH=False in your Django settings.
+[26/Apr/2026 13:30:16] "POST /api/students HTTP/1.1" 500 72200
+Internal Server Error: /api/students
+Traceback (most recent call last):
+  File "/Library/Frameworks/Python.framework/Versions/3.14/lib/python3.14/site-packages/django/core/handlers/exception.py", line 55, in inner
+    response = get_response(request)
+  File "/Library/Frameworks/Python.framework/Versions/3.14/lib/python3.14/site-packages/django/utils/deprecation.py", line 122, in __call__
+    response = self.process_response(request, response)
+  File "/Library/Frameworks/Python.framework/Versions/3.14/lib/python3.14/site-packages/django/middleware/common.py", line 108, in process_response
+    return self.response_redirect_class(self.get_full_path_with_slash(request))
+                                        ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^
+  File "/Library/Frameworks/Python.framework/Versions/3.14/lib/python3.14/site-packages/django/middleware/common.py", line 87, in get_full_path_with_slash
+    raise RuntimeError(
+    ...<9 lines>...
+    )
+RuntimeError: You called this URL via POST, but the URL doesn't end in a slash and you have APPEND_SLASH set. Django can't redirect to the slash URL while maintaining POST data. Change your form to point to 127.0.0.1:8000/api/students/ (note the trailing slash), or set APPEND_SLASH=False in your Django settings.
+[26/Apr/2026 13:30:16] "POST /api/students HTTP/1.1" 500 72200
+Internal Server Error: /api/students
+Traceback (most recent call last):
+  File "/Library/Frameworks/Python.framework/Versions/3.14/lib/python3.14/site-packages/django/core/handlers/exception.py", line 55, in inner
+    response = get_response(request)
+  File "/Library/Frameworks/Python.framework/Versions/3.14/lib/python3.14/site-packages/django/utils/deprecation.py", line 122, in __call__
+    response = self.process_response(request, response)
+  File "/Library/Frameworks/Python.framework/Versions/3.14/lib/python3.14/site-packages/django/middleware/common.py", line 108, in process_response
+    return self.response_redirect_class(self.get_full_path_with_slash(request))
+                                        ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^
+  File "/Library/Frameworks/Python.framework/Versions/3.14/lib/python3.14/site-packages/django/middleware/common.py", line 87, in get_full_path_with_slash
+    raise RuntimeError(
+    ...<9 lines>...
+    )
+RuntimeError: You called this URL via POST, but the URL doesn't end in a slash and you have APPEND_SLASH set. Django can't redirect to the slash URL while maintaining POST data. Change your form to point to 127.0.0.1:8000/api/students/ (note the trailing slash), or set APPEND_SLASH=False in your Django settings.
+[26/Apr/2026 13:30:16] "POST /api/students HTTP/1.1" 500 72200
+Internal Server Error: /api/students
+Traceback (most recent call last):
+  File "/Library/Frameworks/Python.framework/Versions/3.14/lib/python3.14/site-packages/django/core/handlers/exception.py", line 55, in inner
+    response = get_response(request)
+  File "/Library/Frameworks/Python.framework/Versions/3.14/lib/python3.14/site-packages/django/utils/deprecation.py", line 122, in __call__
+    response = self.process_response(request, response)
+  File "/Library/Frameworks/Python.framework/Versions/3.14/lib/python3.14/site-packages/django/middleware/common.py", line 108, in process_response
+    return self.response_redirect_class(self.get_full_path_with_slash(request))
+                                        ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^
+  File "/Library/Frameworks/Python.framework/Versions/3.14/lib/python3.14/site-packages/django/middleware/common.py", line 87, in get_full_path_with_slash
+    raise RuntimeError(
+    ...<9 lines>...
+    )
+RuntimeError: You called this URL via POST, but the URL doesn't end in a slash and you have APPEND_SLASH set. Django can't redirect to the slash URL while maintaining POST data. Change your form to point to 127.0.0.1:8000/api/students/ (note the trailing slash), or set APPEND_SLASH=False in your Django settings.
+[26/Apr/2026 13:30:17] "POST /api/students HTTP/1.1" 500 72200
+Internal Server Error: /api/students
+Traceback (most recent call last):
+  File "/Library/Frameworks/Python.framework/Versions/3.14/lib/python3.14/site-packages/django/core/handlers/exception.py", line 55, in inner
+    response = get_response(request)
+  File "/Library/Frameworks/Python.framework/Versions/3.14/lib/python3.14/site-packages/django/utils/deprecation.py", line 122, in __call__
+    response = self.process_response(request, response)
+  File "/Library/Frameworks/Python.framework/Versions/3.14/lib/python3.14/site-packages/django/middleware/common.py", line 108, in process_response
+    return self.response_redirect_class(self.get_full_path_with_slash(request))
+                                        ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^
+  File "/Library/Frameworks/Python.framework/Versions/3.14/lib/python3.14/site-packages/django/middleware/common.py", line 87, in get_full_path_with_slash
+    raise RuntimeError(
+    ...<9 lines>...
+    )
+RuntimeError: You called this URL via POST, but the URL doesn't end in a slash and you have APPEND_SLASH set. Django can't redirect to the slash URL while maintaining POST data. Change your form to point to 127.0.0.1:8000/api/students/ (note the trailing slash), or set APPEND_SLASH=False in your Django settings.
+[26/Apr/2026 13:30:17] "POST /api/students HTTP/1.1" 500 72200
+Performing system checks...
+
+System check identified no issues (0 silenced).
+April 26, 2026 - 13:25:42
+Django version 5.2.4, using settings 'aims_college.settings'
+Starting development server at http://127.0.0.1:8000/
+Quit the server with CONTROL-C.
+
+WARNING: This is a development server. Do not use it in a production setting. Use a production WSGI or ASGI server instead.
+For more information on production servers see: https://docs.djangoproject.com/en/5.2/howto/deployment/
