@@ -92,6 +92,7 @@ class TaskSerializer(serializers.ModelSerializer):
             "student",
             "student_username",
             "due_date",
+            "deadline",
             "is_completed",
             "created_at",
         )
@@ -99,9 +100,12 @@ class TaskSerializer(serializers.ModelSerializer):
 
 
 class TaskCreateUpdateSerializer(serializers.ModelSerializer):
+    deadline = serializers.DateTimeField(required=False)
+
     class Meta:
         model = Task
-        fields = ("title", "description", "due_date", "is_completed")
+        fields = ("title", "description", "due_date",
+                  "deadline", "is_completed")
 
 
 class StudentTaskSubmissionSerializer(serializers.ModelSerializer):

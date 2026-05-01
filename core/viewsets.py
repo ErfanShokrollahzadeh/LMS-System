@@ -234,9 +234,20 @@ class EnrollmentViewSet(viewsets.ModelViewSet):
         Teachers see their enrolled students.
         """
         user = self.request.user
-        if user.role == User.IS_TEACHER:
-            return Enrollment.objects.filter(teacher=user)
-        return Enrollment.objects.none()
+        if user.role == User.IS_ADMIN or user.is_superuser:
+            queryset = Enrollment.objects.all()
+        elif user.role == User.IS_TEACHER:
+            queryset = Enrollment.objects.filter(teacher=user)
+        else:
+            return Enrollment.objects.none()
+
+        teacher_id = self.request.query_params.get("teacher_id")
+        if teacher_id:
+            if user.role == User.IS_TEACHER and str(user.id) != str(teacher_id):
+                return Enrollment.objects.none()
+            queryset = queryset.filter(teacher_id=teacher_id)
+
+        return queryset
 
     @action(detail=False, methods=["post"], permission_classes=[IsAuthenticated])
     def enroll_existing_student(self, request):
@@ -307,10 +318,21 @@ class TaskViewSet(viewsets.ModelViewSet):
         """
         user = self.request.user
         if user.role == User.IS_TEACHER:
-            return Task.objects.filter(teacher=user)
+            queryset = Task.objects.filter(teacher=user)
         elif user.role == User.IS_STUDENT:
-            return Task.objects.filter(student=user)
-        return Task.objects.none()
+            queryset = Task.objects.filter(student=user)
+        elif user.role == User.IS_ADMIN or user.is_superuser:
+            queryset = Task.objects.all()
+        else:
+            return Task.objects.none()
+
+        student_id = self.request.query_params.get("student_id")
+        if student_id:
+            if user.role == User.IS_STUDENT and str(user.id) != str(student_id):
+                return Task.objects.none()
+            queryset = queryset.filter(student_id=student_id)
+
+        return queryset.order_by("deadline", "due_date")
 
     def create(self, request, *args, **kwargs):
         """
@@ -320,7 +342,8 @@ class TaskViewSet(viewsets.ModelViewSet):
                 "student_id": 5,
                 "title": "Math Homework",
                 "description": "Chapter 5 problems",
-                "due_date": "2026-05-01T10:00:00Z"
+                "due_date": "2026-05-01T10:00:00Z",
+                "deadline": "2026-05-02T10:00:00Z"
             }
         """
         if request.user.role != User.IS_TEACHER:

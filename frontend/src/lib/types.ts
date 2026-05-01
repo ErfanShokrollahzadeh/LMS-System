@@ -39,3 +39,29 @@ export interface UserCreateInput extends UserMutationInput {
 export interface UserUpdateInput extends UserMutationInput {
   id: number;
 }
+
+export interface Task {
+  id: number;
+  title: string;
+  description: string;
+  due_date: string;
+  deadline: string;
+  is_completed: boolean;
+  created_at: string;
+}
+
+export interface TaskCreateInput {
+  student_id: number;
+  title: string;
+  description: string;
+  due_date: string;
+  deadline?: string;
+}
+
+export interface Enrollment {
+  id: number;
+  teacher_username: string;
+  student: UserProfile;
+  student_username: string;
+  enrolled_at: string;
+}

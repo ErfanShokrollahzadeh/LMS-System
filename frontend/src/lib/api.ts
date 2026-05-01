@@ -1,4 +1,7 @@
 import type {
+  Enrollment,
+  Task,
+  TaskCreateInput,
   TokenPair,
   UserCreateInput,
   UserProfile,
@@ -210,4 +213,50 @@ export async function deleteUser(token: string, id: number): Promise<void> {
     const body = await response.json().catch(() => ({}));
     throw new Error(body?.detail || "Failed to delete user");
   }
+}
+
+export async function getStudentTasks(token: string, studentId: number): Promise<Task[]> {
+  const response = await apiFetch(`/api/tasks/?student_id=${studentId}`, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+
+  const payload = await parseJson(response);
+  return toList<Task>(payload);
+}
+
+export async function getMyStudents(token: string): Promise<Enrollment[]> {
+  const response = await apiFetch("/api/enrollments/my_students/", {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+
+  const payload = await parseJson(response);
+  return toList<Enrollment>(payload);
+}
+
+export async function getTeacherStudents(token: string, teacherId: number): Promise<Enrollment[]> {
+  const response = await apiFetch(`/api/enrollments/?teacher_id=${teacherId}`, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+
+  const payload = await parseJson(response);
+  return toList<Enrollment>(payload);
+}
+
+export async function createTask(token: string, payload: TaskCreateInput): Promise<Task> {
+  const response = await apiFetch("/api/tasks/", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(payload),
+  });
+
+  return parseJson(response);
 }
