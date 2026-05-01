@@ -584,12 +584,84 @@ export function RoleListPage({ role, title, subtitle }: RoleListPageProps) {
                                 due_date: "",
                                 deadline: "",
                               };
+                              const studentTasks = tasksByStudent[student.id] || [];
+                              const isTasksExpanded = !!expandedStudents[student.id];
                               return (
                                 <div key={enrollment.id} className="rounded-md border border-(--line) bg-white px-3 py-2">
                                   <div className="mb-2">
                                     <p className="text-sm font-semibold">{student.first_name} {student.last_name}</p>
                                     <p className="text-xs text-(--text-soft)">@{student.username}</p>
                                   </div>
+
+                                  <button
+                                    type="button"
+                                    onClick={() => toggleStudentTasks(student.id)}
+                                    className="mb-2 inline-flex items-center gap-2 rounded-lg border border-(--line) bg-(--surface) px-3 py-1.5 text-xs font-semibold"
+                                  >
+                                    {isTasksExpanded ? "Hide Tasks" : "View Tasks"}
+                                    {isTasksExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                                  </button>
+
+                                  {isTasksExpanded && (
+                                    <div className="mb-3 space-y-2">
+                                      {tasksLoading[student.id] && (
+                                        <div className="text-xs text-(--text-soft)">Loading tasks...</div>
+                                      )}
+                                      {!tasksLoading[student.id] && tasksError[student.id] && (
+                                        <div className="text-xs text-(--danger)">{tasksError[student.id]}</div>
+                                      )}
+                                      {!tasksLoading[student.id] && !tasksError[student.id] && studentTasks.length === 0 && (
+                                        <div className="text-xs text-(--text-soft)">No tasks assigned yet.</div>
+                                      )}
+                                      {!tasksLoading[student.id] && !tasksError[student.id] && studentTasks.length > 0 && (
+                                        <div className="space-y-2">
+                                          {studentTasks.map((task) => {
+                                            const fileUrl = task.answer_file ? toPhotoUrl(task.answer_file) : null;
+                                            return (
+                                              <div key={task.id} className="rounded-md border border-(--line) bg-(--surface-muted) px-3 py-2">
+                                                <div className="flex items-start justify-between gap-2">
+                                                  <div>
+                                                    <p className="text-xs font-semibold">{task.title}</p>
+                                                    {task.description && (
+                                                      <p className="text-[11px] text-(--text-soft)">{task.description}</p>
+                                                    )}
+                                                  </div>
+                                                  <span
+                                                    className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${task.is_completed
+                                                      ? "bg-emerald-100 text-emerald-700"
+                                                      : "bg-amber-100 text-amber-700"
+                                                      }`}
+                                                  >
+                                                    {task.is_completed ? "Done" : "Pending"}
+                                                  </span>
+                                                </div>
+                                                <div className="mt-1 grid gap-1 text-[11px] text-(--text-soft) sm:grid-cols-2">
+                                                  <p>Due: {formatDate(task.due_date)}</p>
+                                                  <p>Deadline: {formatDate(task.deadline || task.due_date)}</p>
+                                                  <p>Submitted: {task.submitted_at ? formatDate(task.submitted_at) : "-"}</p>
+                                                </div>
+                                                {task.answer_text && (
+                                                  <p className="mt-2 text-[11px] text-(--text-soft)">
+                                                    Answer: {task.answer_text}
+                                                  </p>
+                                                )}
+                                                {fileUrl && (
+                                                  <a
+                                                    href={fileUrl}
+                                                    target="_blank"
+                                                    rel="noreferrer"
+                                                    className="mt-2 inline-flex text-[11px] font-semibold text-(--brand-strong)"
+                                                  >
+                                                    View uploaded file
+                                                  </a>
+                                                )}
+                                              </div>
+                                            );
+                                          })}
+                                        </div>
+                                      )}
+                                    </div>
+                                  )}
 
                                   {canAssignForTeacher ? (
                                     <form onSubmit={(event) => onCreateTask(event, student.id)} className="space-y-2">
