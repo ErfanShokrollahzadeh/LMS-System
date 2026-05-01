@@ -5,9 +5,9 @@ import { useRouter } from "next/navigation";
 import { ChevronDown, ChevronUp, Pencil, Plus, Trash2, X } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
 import { canAccessSection } from "@/lib/access";
-import { ApiError, createTask, createUser, deleteUser, getMyProfile, getStudentTasks, getTeacherStudents, getUsersByRole, submitTaskAnswer, toPhotoUrl, updateUser } from "@/lib/api";
+import { ApiError, createTask, createUser, deleteStudentByTeacher, deleteUser, enrollStudentByTeacher, getMyProfile, getStudentTasks, getTeacherStudents, getUsersByRole, submitTaskAnswer, toPhotoUrl, updateStudentByTeacher, updateUser } from "@/lib/api";
 import { clearSession, getAccessToken, saveRole } from "@/lib/session";
-import type { Enrollment, Task, TaskCreateInput, TaskSubmissionInput, UserCreateInput, UserProfile, UserRole } from "@/lib/types";
+import type { Enrollment, StudentCreateInput, StudentUpdateInput, Task, TaskCreateInput, TaskSubmissionInput, UserCreateInput, UserProfile, UserRole } from "@/lib/types";
 
 interface RoleListPageProps {
   role: UserRole;
@@ -27,6 +27,11 @@ export function RoleListPage({ role, title, subtitle }: RoleListPageProps) {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [photoFile, setPhotoFile] = useState<File | null>(null);
+  const [isStudentModalOpen, setIsStudentModalOpen] = useState(false);
+  const [studentEditingId, setStudentEditingId] = useState<number | null>(null);
+  const [activeTeacherId, setActiveTeacherId] = useState<number | null>(null);
+  const [studentModalError, setStudentModalError] = useState("");
+  const [studentBusy, setStudentBusy] = useState(false);
   const [expandedStudents, setExpandedStudents] = useState<Record<number, boolean>>({});
   const [expandedTeachers, setExpandedTeachers] = useState<Record<number, boolean>>({});
   const [tasksByStudent, setTasksByStudent] = useState<Record<number, Task[]>>({});
@@ -49,6 +54,13 @@ export function RoleListPage({ role, title, subtitle }: RoleListPageProps) {
     gender: "",
     current_academic: "",
     enrolled_status: true,
+  });
+  const [studentFormState, setStudentFormState] = useState({
+    username: "",
+    password: "",
+    email: "",
+    first_name: "",
+    last_name: "",
   });
 
   const isEditing = editingId !== null;
@@ -188,6 +200,41 @@ export function RoleListPage({ role, title, subtitle }: RoleListPageProps) {
     setIsModalOpen(false);
   };
 
+  const openStudentCreateModal = (teacherId: number) => {
+    setActiveTeacherId(teacherId);
+    setStudentEditingId(null);
+    setStudentFormState({
+      username: "",
+      password: "",
+      email: "",
+      first_name: "",
+      last_name: "",
+    });
+    setStudentModalError("");
+    setIsStudentModalOpen(true);
+  };
+
+  const openStudentEditModal = (teacherId: number, student: UserProfile) => {
+    setActiveTeacherId(teacherId);
+    setStudentEditingId(student.id);
+    setStudentFormState({
+      username: student.username,
+      password: "",
+      email: student.email || "",
+      first_name: student.first_name || "",
+      last_name: student.last_name || "",
+    });
+    setStudentModalError("");
+    setIsStudentModalOpen(true);
+  };
+
+  const closeStudentModal = () => {
+    if (studentBusy) {
+      return;
+    }
+    setIsStudentModalOpen(false);
+  };
+
   const loadUsers = useCallback(async () => {
     const token = getAccessToken();
     if (!token) {
@@ -308,6 +355,86 @@ export function RoleListPage({ role, title, subtitle }: RoleListPageProps) {
       setError(message);
     } finally {
       setBusy(false);
+    }
+  };
+
+  const onSaveStudent = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const token = getAccessToken();
+    if (!token) {
+      router.push("/login");
+      return;
+    }
+
+    if (!activeTeacherId) {
+      setStudentModalError("Missing teacher context.");
+      return;
+    }
+
+    if (!studentFormState.username || (!studentEditingId && !studentFormState.password)) {
+      setStudentModalError("Username and password are required for new students.");
+      return;
+    }
+
+    setStudentBusy(true);
+    setStudentModalError("");
+
+    try {
+      if (studentEditingId) {
+        const payload: StudentUpdateInput = {
+          id: studentEditingId,
+          username: studentFormState.username,
+          email: studentFormState.email,
+          first_name: studentFormState.first_name,
+          last_name: studentFormState.last_name,
+        };
+        await updateStudentByTeacher(token, payload);
+        setSuccessMessage("Student updated successfully.");
+      } else {
+        const payload: StudentCreateInput = {
+          username: studentFormState.username,
+          password: studentFormState.password,
+          email: studentFormState.email,
+          first_name: studentFormState.first_name,
+          last_name: studentFormState.last_name,
+        };
+        await enrollStudentByTeacher(token, payload);
+        setSuccessMessage("Student enrolled successfully.");
+      }
+
+      setIsStudentModalOpen(false);
+      await loadTeacherStudents(activeTeacherId, true);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Failed to save student";
+      setStudentModalError(message);
+    } finally {
+      setStudentBusy(false);
+    }
+  };
+
+  const onDeleteStudent = async (studentId: number, teacherId: number) => {
+    const token = getAccessToken();
+    if (!token) {
+      router.push("/login");
+      return;
+    }
+
+    const confirmed = window.confirm("Delete this student?");
+    if (!confirmed) {
+      return;
+    }
+
+    setStudentBusy(true);
+    setStudentModalError("");
+    try {
+      await deleteStudentByTeacher(token, studentId);
+      setSuccessMessage("Student deleted successfully.");
+      await loadTeacherStudents(teacherId, true);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Failed to delete student";
+      setStudentModalError(message);
+    } finally {
+      setStudentBusy(false);
     }
   };
 
@@ -572,6 +699,15 @@ export function RoleListPage({ role, title, subtitle }: RoleListPageProps) {
                         )}
                         {!teacherStudentsLoading[user.id] && !teacherStudentsError[user.id] && (
                           <div className="space-y-2">
+                            {canAssignForTeacher && (
+                              <button
+                                type="button"
+                                onClick={() => openStudentCreateModal(user.id)}
+                                className="w-full rounded-lg border border-(--line) bg-(--surface) px-3 py-2 text-xs font-semibold"
+                              >
+                                Add Student
+                              </button>
+                            )}
                             {(teacherStudents[user.id] || []).length === 0 && (
                               <div className="text-sm text-(--text-soft)">No students enrolled yet.</div>
                             )}
@@ -592,6 +728,25 @@ export function RoleListPage({ role, title, subtitle }: RoleListPageProps) {
                                     <p className="text-sm font-semibold">{student.first_name} {student.last_name}</p>
                                     <p className="text-xs text-(--text-soft)">@{student.username}</p>
                                   </div>
+
+                                  {canAssignForTeacher && (
+                                    <div className="mb-2 flex flex-wrap gap-2">
+                                      <button
+                                        type="button"
+                                        onClick={() => openStudentEditModal(user.id, student)}
+                                        className="rounded-lg border border-(--line) bg-(--surface) px-2 py-1 text-[11px] font-semibold"
+                                      >
+                                        Edit Student
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={() => onDeleteStudent(student.id, user.id)}
+                                        className="rounded-lg border border-red-200 bg-red-50 px-2 py-1 text-[11px] font-semibold text-red-700"
+                                      >
+                                        Delete Student
+                                      </button>
+                                    </div>
+                                  )}
 
                                   <button
                                     type="button"
@@ -1040,6 +1195,109 @@ export function RoleListPage({ role, title, subtitle }: RoleListPageProps) {
                   className="btn-primary rounded-lg px-4 py-2 text-sm font-semibold disabled:opacity-60"
                 >
                   {busy ? "Saving..." : isEditing ? "Save Changes" : "Create"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {isStudentModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4">
+          <div className="card w-full max-w-xl p-6">
+            <div className="mb-4 flex items-start justify-between gap-4">
+              <div>
+                <h3 className="text-xl font-semibold">
+                  {studentEditingId ? "Edit Student" : "Add Student"}
+                </h3>
+                <p className="text-sm text-(--text-soft)">Manage only your enrolled students.</p>
+              </div>
+              <button type="button" onClick={closeStudentModal} className="rounded-md p-1 text-(--text-soft) hover:bg-(--surface-muted)">
+                <X size={18} />
+              </button>
+            </div>
+
+            {studentModalError && (
+              <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-(--danger)">
+                {studentModalError}
+              </div>
+            )}
+
+            <form onSubmit={onSaveStudent} className="grid gap-3 sm:grid-cols-2">
+              <label className="text-sm font-medium">
+                Username
+                <input
+                  required
+                  value={studentFormState.username}
+                  onChange={(event) =>
+                    setStudentFormState((prev) => ({ ...prev, username: event.target.value }))
+                  }
+                  className="mt-1 w-full rounded-lg border border-(--line) bg-white px-3 py-2"
+                />
+              </label>
+
+              {!studentEditingId && (
+                <label className="text-sm font-medium">
+                  Password
+                  <input
+                    required
+                    type="password"
+                    value={studentFormState.password}
+                    onChange={(event) =>
+                      setStudentFormState((prev) => ({ ...prev, password: event.target.value }))
+                    }
+                    className="mt-1 w-full rounded-lg border border-(--line) bg-white px-3 py-2"
+                  />
+                </label>
+              )}
+
+              <label className="text-sm font-medium">
+                Email
+                <input
+                  value={studentFormState.email}
+                  onChange={(event) =>
+                    setStudentFormState((prev) => ({ ...prev, email: event.target.value }))
+                  }
+                  className="mt-1 w-full rounded-lg border border-(--line) bg-white px-3 py-2"
+                />
+              </label>
+
+              <label className="text-sm font-medium">
+                First Name
+                <input
+                  value={studentFormState.first_name}
+                  onChange={(event) =>
+                    setStudentFormState((prev) => ({ ...prev, first_name: event.target.value }))
+                  }
+                  className="mt-1 w-full rounded-lg border border-(--line) bg-white px-3 py-2"
+                />
+              </label>
+
+              <label className="text-sm font-medium">
+                Last Name
+                <input
+                  value={studentFormState.last_name}
+                  onChange={(event) =>
+                    setStudentFormState((prev) => ({ ...prev, last_name: event.target.value }))
+                  }
+                  className="mt-1 w-full rounded-lg border border-(--line) bg-white px-3 py-2"
+                />
+              </label>
+
+              <div className="sm:col-span-2 mt-2 flex justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={closeStudentModal}
+                  className="rounded-lg border border-(--line) px-4 py-2 text-sm font-semibold"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={studentBusy}
+                  className="btn-primary rounded-lg px-4 py-2 text-sm font-semibold disabled:opacity-60"
+                >
+                  {studentBusy ? "Saving..." : studentEditingId ? "Save Changes" : "Create"}
                 </button>
               </div>
             </form>

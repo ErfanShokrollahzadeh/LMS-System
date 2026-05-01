@@ -3,6 +3,8 @@ import type {
   Task,
   TaskCreateInput,
   TaskSubmissionInput,
+  StudentCreateInput,
+  StudentUpdateInput,
   TokenPair,
   UserCreateInput,
   UserProfile,
@@ -183,6 +185,13 @@ function appendCommonUserFields(formData: FormData, payload: Omit<UserCreateInpu
   }
 }
 
+function appendStudentField(formData: FormData, key: string, value?: string | boolean | null) {
+  if (value === undefined || value === null) {
+    return;
+  }
+  formData.append(key, typeof value === "boolean" ? (value ? "true" : "false") : value);
+}
+
 export async function createUser(token: string, payload: UserCreateInput): Promise<UserProfile> {
   const formData = new FormData();
   appendCommonUserFields(formData, payload);
@@ -212,6 +221,75 @@ export async function updateUser(token: string, payload: UserUpdateInput): Promi
   });
 
   return parseJson(response);
+}
+
+export async function enrollStudentByTeacher(
+  token: string,
+  payload: StudentCreateInput
+): Promise<UserProfile> {
+  const formData = new FormData();
+  appendStudentField(formData, "username", payload.username);
+  appendStudentField(formData, "password", payload.password);
+  appendStudentField(formData, "email", payload.email || "");
+  appendStudentField(formData, "first_name", payload.first_name || "");
+  appendStudentField(formData, "last_name", payload.last_name || "");
+  appendStudentField(formData, "date_of_birth", payload.date_of_birth || "");
+  appendStudentField(formData, "gender", payload.gender || "");
+  appendStudentField(formData, "current_academic", payload.current_academic || "");
+  if (payload.enrolled_status !== undefined) {
+    appendStudentField(formData, "enrolled_status", payload.enrolled_status);
+  }
+
+  const response = await apiFetch("/api/students/enroll_student_by_teacher/", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+    body: formData,
+  });
+
+  return parseJson(response);
+}
+
+export async function updateStudentByTeacher(
+  token: string,
+  payload: StudentUpdateInput
+): Promise<UserProfile> {
+  const formData = new FormData();
+  appendStudentField(formData, "username", payload.username);
+  appendStudentField(formData, "email", payload.email);
+  appendStudentField(formData, "first_name", payload.first_name);
+  appendStudentField(formData, "last_name", payload.last_name);
+  appendStudentField(formData, "date_of_birth", payload.date_of_birth);
+  appendStudentField(formData, "gender", payload.gender);
+  appendStudentField(formData, "current_academic", payload.current_academic);
+  if (payload.enrolled_status !== undefined) {
+    appendStudentField(formData, "enrolled_status", payload.enrolled_status);
+  }
+
+  const response = await apiFetch(`/api/students/${payload.id}/`, {
+    method: "PATCH",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+    body: formData,
+  });
+
+  return parseJson(response);
+}
+
+export async function deleteStudentByTeacher(token: string, id: number): Promise<void> {
+  const response = await apiFetch(`/api/students/${id}/`, {
+    method: "DELETE",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+
+  if (!response.ok) {
+    const body = await response.json().catch(() => ({}));
+    throw new Error(body?.detail || "Failed to delete student");
+  }
 }
 
 export async function deleteUser(token: string, id: number): Promise<void> {

@@ -66,6 +66,26 @@ class StudentViewSet(viewsets.ModelViewSet):
             )
         return None
 
+    def _ensure_can_manage_user(self, request, target_user):
+        if self._is_admin(request.user):
+            return None
+
+        if request.user.role == User.IS_TEACHER and target_user.role == User.IS_STUDENT:
+            if Enrollment.objects.filter(
+                teacher=request.user,
+                student=target_user,
+            ).exists():
+                return None
+            return Response(
+                {"detail": "You can only manage your enrolled students."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        return Response(
+            {"detail": "Only managers can manage users."},
+            status=status.HTTP_403_FORBIDDEN,
+        )
+
     def create(self, request, *args, **kwargs):
         denied = self._ensure_admin(request)
         if denied:
@@ -89,22 +109,40 @@ class StudentViewSet(viewsets.ModelViewSet):
         return Response(UserSerializer(user).data, status=status.HTTP_201_CREATED)
 
     def update(self, request, *args, **kwargs):
-        denied = self._ensure_admin(request)
+        instance = self.get_object()
+        denied = self._ensure_can_manage_user(request, instance)
         if denied:
             return denied
-        return super().update(request, *args, **kwargs)
+        data = request.data.copy()
+        if not self._is_admin(request.user):
+            data.pop("role", None)
+
+        serializer = self.get_serializer(instance, data=data)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response(serializer.data)
 
     def partial_update(self, request, *args, **kwargs):
-        denied = self._ensure_admin(request)
+        instance = self.get_object()
+        denied = self._ensure_can_manage_user(request, instance)
         if denied:
             return denied
-        return super().partial_update(request, *args, **kwargs)
+        data = request.data.copy()
+        if not self._is_admin(request.user):
+            data.pop("role", None)
+
+        serializer = self.get_serializer(instance, data=data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response(serializer.data)
 
     def destroy(self, request, *args, **kwargs):
-        denied = self._ensure_admin(request)
+        instance = self.get_object()
+        denied = self._ensure_can_manage_user(request, instance)
         if denied:
             return denied
-        return super().destroy(request, *args, **kwargs)
+        instance.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
     @action(detail=False, methods=["get"])
     def me(self, request):

@@ -40,6 +40,30 @@ export interface UserUpdateInput extends UserMutationInput {
   id: number;
 }
 
+export interface StudentCreateInput {
+  username: string;
+  password: string;
+  email?: string;
+  first_name?: string;
+  last_name?: string;
+  date_of_birth?: string;
+  gender?: string;
+  current_academic?: string;
+  enrolled_status?: boolean;
+}
+
+export interface StudentUpdateInput {
+  id: number;
+  username?: string;
+  email?: string;
+  first_name?: string;
+  last_name?: string;
+  date_of_birth?: string;
+  gender?: string;
+  current_academic?: string;
+  enrolled_status?: boolean;
+}
+
 export interface Task {
   id: number;
   title: string;
