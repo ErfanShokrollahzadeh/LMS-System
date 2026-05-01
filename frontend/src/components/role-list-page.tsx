@@ -739,45 +739,49 @@ export function RoleListPage({ role, title, subtitle }: RoleListPageProps) {
                                     </a>
                                   )}
                                   {canSubmitAnswers && viewerProfile?.id === user.id && (
-                                    <form
-                                      onSubmit={(event) => onSubmitAnswer(event, task.id, user.id)}
-                                      className="mt-3 space-y-2"
-                                    >
-                                      <label className="text-xs font-semibold text-(--text-soft)">
-                                        Your answer (optional)
-                                        <textarea
-                                          value={answerForm.answer_text}
-                                          onChange={(event) =>
-                                            setAnswerFormByTask((prev) => ({
-                                              ...prev,
-                                              [task.id]: { ...answerForm, answer_text: event.target.value },
-                                            }))
-                                          }
-                                          className="mt-1 w-full rounded-lg border border-(--line) bg-white px-3 py-2 text-sm"
-                                          rows={2}
-                                        />
-                                      </label>
-                                      <label className="text-xs font-semibold text-(--text-soft)">
-                                        Upload file
-                                        <input
-                                          type="file"
-                                          onChange={(event) =>
-                                            setAnswerFormByTask((prev) => ({
-                                              ...prev,
-                                              [task.id]: { ...answerForm, answer_file: event.target.files?.[0] || null },
-                                            }))
-                                          }
-                                          className="mt-1 w-full rounded-lg border border-(--line) bg-white px-3 py-2 text-sm"
-                                        />
-                                      </label>
-                                      <button
-                                        type="submit"
-                                        disabled={answerBusyByTask[task.id]}
-                                        className="btn-primary w-full rounded-lg px-3 py-2 text-sm font-semibold disabled:opacity-60"
+                                    !task.is_completed ? (
+                                      <form
+                                        onSubmit={(event) => onSubmitAnswer(event, task.id, user.id)}
+                                        className="mt-3 space-y-2"
                                       >
-                                        {answerBusyByTask[task.id] ? "Submitting..." : "Submit Answer"}
-                                      </button>
-                                    </form>
+                                        <label className="text-xs font-semibold text-(--text-soft)">
+                                          Your answer (optional)
+                                          <textarea
+                                            value={answerForm.answer_text}
+                                            onChange={(event) =>
+                                              setAnswerFormByTask((prev) => ({
+                                                ...prev,
+                                                [task.id]: { ...answerForm, answer_text: event.target.value },
+                                              }))
+                                            }
+                                            className="mt-1 w-full rounded-lg border border-(--line) bg-white px-3 py-2 text-sm"
+                                            rows={2}
+                                          />
+                                        </label>
+                                        <label className="text-xs font-semibold text-(--text-soft)">
+                                          Upload file
+                                          <input
+                                            type="file"
+                                            onChange={(event) =>
+                                              setAnswerFormByTask((prev) => ({
+                                                ...prev,
+                                                [task.id]: { ...answerForm, answer_file: event.target.files?.[0] || null },
+                                              }))
+                                            }
+                                            className="mt-1 w-full rounded-lg border border-(--line) bg-white px-3 py-2 text-sm"
+                                          />
+                                        </label>
+                                        <button
+                                          type="submit"
+                                          disabled={answerBusyByTask[task.id]}
+                                          className="btn-primary w-full rounded-lg px-3 py-2 text-sm font-semibold disabled:opacity-60"
+                                        >
+                                          {answerBusyByTask[task.id] ? "Submitting..." : "Submit Answer"}
+                                        </button>
+                                      </form>
+                                    ) : (
+                                      <p className="mt-3 text-xs font-semibold text-emerald-700">Answer submitted.</p>
+                                    )
                                   )}
                                 </div>
                               );
