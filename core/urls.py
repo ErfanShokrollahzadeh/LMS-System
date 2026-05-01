@@ -59,6 +59,12 @@ urlpatterns = [
         ),
         name="student_detail",
     ),
+    # Accept task list without trailing slash for POST safety with APPEND_SLASH.
+    path(
+        "tasks",
+        TaskViewSet.as_view({"get": "list", "post": "create"}),
+        name="task_list_no_slash",
+    ),
     # API endpoints
     path("", include(router.urls)),
 ]

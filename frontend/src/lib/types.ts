@@ -44,9 +44,13 @@ export interface Task {
   id: number;
   title: string;
   description: string;
+  teacher_username: string;
   due_date: string;
   deadline: string;
   is_completed: boolean;
+  answer_text: string;
+  answer_file: string | null;
+  submitted_at: string | null;
   created_at: string;
 }
 
@@ -56,6 +60,11 @@ export interface TaskCreateInput {
   description: string;
   due_date: string;
   deadline?: string;
+}
+
+export interface TaskSubmissionInput {
+  answer_text: string;
+  answer_file?: File | null;
 }
 
 export interface Enrollment {

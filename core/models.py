@@ -124,6 +124,13 @@ class Task(models.Model):
     due_date = models.DateTimeField()
     deadline = models.DateTimeField()
     is_completed = models.BooleanField(default=False)
+    answer_text = models.TextField(blank=True)
+    answer_file = models.FileField(
+        upload_to="task_submissions/",
+        null=True,
+        blank=True,
+    )
+    submitted_at = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:

@@ -2,6 +2,7 @@ import type {
   Enrollment,
   Task,
   TaskCreateInput,
+  TaskSubmissionInput,
   TokenPair,
   UserCreateInput,
   UserProfile,
@@ -42,6 +43,17 @@ function apiUrl(path: string) {
   return `${API_PREFIX}${path}`;
 }
 
+function normalizeApiPath(path: string) {
+  if (!path.startsWith("/api/")) {
+    return path;
+  }
+  const [base, query] = path.split("?", 2);
+  if (base.endsWith("/")) {
+    return path;
+  }
+  return query ? `${base}/?${query}` : `${base}/`;
+}
+
 function directApiUrl(path: string) {
   const normalizedBase = DIRECT_BACKEND_URL.endsWith("/")
     ? DIRECT_BACKEND_URL.slice(0, -1)
@@ -51,19 +63,20 @@ function directApiUrl(path: string) {
 }
 
 async function apiFetch(path: string, init?: RequestInit) {
+  const normalizedPath = normalizeApiPath(path);
   try {
-    return await fetch(apiUrl(path), init);
+    return await fetch(apiUrl(normalizedPath), init);
   } catch {
     if (!isAbsoluteUrl(API_PREFIX)) {
       try {
-        return await fetch(directApiUrl(path), init);
+        return await fetch(directApiUrl(normalizedPath), init);
       } catch {
         // Fall through to final connectivity error.
       }
     }
 
     throw new ApiError(
-      `Unable to reach backend API. Tried ${apiUrl(path)}${!isAbsoluteUrl(API_PREFIX) ? ` and ${directApiUrl(path)}` : ""}. Make sure the backend is running, or set NEXT_PUBLIC_API_PREFIX / NEXT_PUBLIC_DJANGO_BACKEND_URL correctly.`,
+      `Unable to reach backend API. Tried ${apiUrl(normalizedPath)}${!isAbsoluteUrl(API_PREFIX) ? ` and ${directApiUrl(normalizedPath)}` : ""}. Make sure the backend is running, or set NEXT_PUBLIC_API_PREFIX / NEXT_PUBLIC_DJANGO_BACKEND_URL correctly.`,
       0
     );
   }
@@ -256,6 +269,30 @@ export async function createTask(token: string, payload: TaskCreateInput): Promi
       "Content-Type": "application/json",
     },
     body: JSON.stringify(payload),
+  });
+
+  return parseJson(response);
+}
+
+export async function submitTaskAnswer(
+  token: string,
+  taskId: number,
+  payload: TaskSubmissionInput
+): Promise<Task> {
+  const formData = new FormData();
+  if (payload.answer_text) {
+    formData.append("answer_text", payload.answer_text);
+  }
+  if (payload.answer_file) {
+    formData.append("answer_file", payload.answer_file);
+  }
+
+  const response = await apiFetch(`/api/tasks/${taskId}/submit_task/`, {
+    method: "PATCH",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+    body: formData,
   });
 
   return parseJson(response);

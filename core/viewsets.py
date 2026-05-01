@@ -3,6 +3,7 @@ import logging
 from django.db import IntegrityError
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
+from rest_framework.parsers import FormParser, MultiPartParser
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.response import Response
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
@@ -438,11 +439,12 @@ class TaskViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=["patch"], permission_classes=[IsAuthenticated])
     def submit_task(self, request, pk=None):
         """
-        Student only: Mark task as completed.
+        Student only: Submit task answer with optional file upload.
         Request:
             PATCH /api/tasks/{id}/submit_task/
             {
-                "is_completed": true
+                "answer_text": "...",
+                "answer_file": <file>
             }
         """
         task = self.get_object()
@@ -457,9 +459,14 @@ class TaskViewSet(viewsets.ModelViewSet):
             task, data=request.data, partial=True
         )
         if serializer.is_valid():
-            serializer.save()
+            serializer.save(
+                is_completed=True,
+                submitted_at=timezone.now(),
+            )
             return Response(TaskSerializer(task).data)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    submit_task.parser_classes = [MultiPartParser, FormParser]
 
     @action(detail=False, methods=["get"], permission_classes=[IsAuthenticated])
     def my_tasks(self, request):
