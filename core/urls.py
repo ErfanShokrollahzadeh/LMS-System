@@ -65,6 +65,17 @@ urlpatterns = [
         TaskViewSet.as_view({"get": "list", "post": "create"}),
         name="task_list_no_slash",
     ),
+    # Accept task submissions with or without trailing slash to avoid PATCH redirects.
+    path(
+        "tasks/<int:pk>/submit_task",
+        TaskViewSet.as_view({"patch": "submit_task"}),
+        name="task_submit_no_slash",
+    ),
+    path(
+        "tasks/<int:pk>/submit_task/",
+        TaskViewSet.as_view({"patch": "submit_task"}),
+        name="task_submit",
+    ),
     # API endpoints
     path("", include(router.urls)),
 ]

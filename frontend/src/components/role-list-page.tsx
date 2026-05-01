@@ -229,6 +229,21 @@ export function RoleListPage({ role, title, subtitle }: RoleListPageProps) {
     loadUsers();
   }, [loadUsers]);
 
+  useEffect(() => {
+    if (viewerRole !== "student" || !viewerProfile || users.length === 0) {
+      return;
+    }
+
+    const studentId = viewerProfile.id;
+    setExpandedStudents((prev) => {
+      if (prev[studentId]) {
+        return prev;
+      }
+      return { ...prev, [studentId]: true };
+    });
+    loadStudentTasks(studentId);
+  }, [loadStudentTasks, users, viewerProfile, viewerRole]);
+
   const onSave = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const token = getAccessToken();
@@ -729,7 +744,7 @@ export function RoleListPage({ role, title, subtitle }: RoleListPageProps) {
                                       className="mt-3 space-y-2"
                                     >
                                       <label className="text-xs font-semibold text-(--text-soft)">
-                                        Your answer
+                                        Your answer (optional)
                                         <textarea
                                           value={answerForm.answer_text}
                                           onChange={(event) =>

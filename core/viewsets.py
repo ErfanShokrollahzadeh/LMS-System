@@ -1,5 +1,7 @@
 import logging
+from pathlib import Path
 
+from django.conf import settings
 from django.db import IntegrityError
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
@@ -436,7 +438,12 @@ class TaskViewSet(viewsets.ModelViewSet):
             status=status.HTTP_204_NO_CONTENT,
         )
 
-    @action(detail=True, methods=["patch"], permission_classes=[IsAuthenticated])
+    @action(
+        detail=True,
+        methods=["patch"],
+        permission_classes=[IsAuthenticated],
+        parser_classes=[MultiPartParser, FormParser],
+    )
     def submit_task(self, request, pk=None):
         """
         Student only: Submit task answer with optional file upload.
@@ -455,18 +462,27 @@ class TaskViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_403_FORBIDDEN,
             )
 
+        if "answer_file" in request.FILES:
+            upload_dir = Path(settings.MEDIA_ROOT) / "task_submissions"
+            upload_dir.mkdir(parents=True, exist_ok=True)
+
         serializer = StudentTaskSubmissionSerializer(
             task, data=request.data, partial=True
         )
         if serializer.is_valid():
-            serializer.save(
-                is_completed=True,
-                submitted_at=timezone.now(),
-            )
+            try:
+                serializer.save(
+                    is_completed=True,
+                    submitted_at=timezone.now(),
+                )
+            except Exception:
+                logger.exception("Failed to submit task answer")
+                return Response(
+                    {"detail": "Unable to upload task answer. Please try again."},
+                    status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                )
             return Response(TaskSerializer(task).data)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
-    submit_task.parser_classes = [MultiPartParser, FormParser]
 
     @action(detail=False, methods=["get"], permission_classes=[IsAuthenticated])
     def my_tasks(self, request):
