@@ -2,12 +2,12 @@
 
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Pencil, Plus, Trash2, X } from "lucide-react";
+import { ChevronDown, ChevronUp, Pencil, Plus, Trash2, X } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
 import { canAccessSection } from "@/lib/access";
-import { ApiError, createUser, deleteUser, getMyProfile, getUsersByRole, toPhotoUrl, updateUser } from "@/lib/api";
+import { ApiError, createTask, createUser, deleteStudentByTeacher, deleteUser, enrollStudentByTeacher, getMyProfile, getStudentTasks, getTeacherStudents, getUsersByRole, submitTaskAnswer, toPhotoUrl, updateStudentByTeacher, updateUser } from "@/lib/api";
 import { clearSession, getAccessToken, saveRole } from "@/lib/session";
-import type { UserCreateInput, UserProfile, UserRole } from "@/lib/types";
+import type { Enrollment, StudentCreateInput, StudentUpdateInput, Task, TaskCreateInput, TaskSubmissionInput, UserCreateInput, UserProfile, UserRole } from "@/lib/types";
 
 interface RoleListPageProps {
   role: UserRole;
@@ -20,11 +20,30 @@ export function RoleListPage({ role, title, subtitle }: RoleListPageProps) {
   const [users, setUsers] = useState<UserProfile[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [successMessage, setSuccessMessage] = useState("");
   const [busy, setBusy] = useState(false);
   const [viewerRole, setViewerRole] = useState<UserRole | null>(null);
+  const [viewerProfile, setViewerProfile] = useState<UserProfile | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [photoFile, setPhotoFile] = useState<File | null>(null);
+  const [isStudentModalOpen, setIsStudentModalOpen] = useState(false);
+  const [studentEditingId, setStudentEditingId] = useState<number | null>(null);
+  const [activeTeacherId, setActiveTeacherId] = useState<number | null>(null);
+  const [studentModalError, setStudentModalError] = useState("");
+  const [studentBusy, setStudentBusy] = useState(false);
+  const [expandedStudents, setExpandedStudents] = useState<Record<number, boolean>>({});
+  const [expandedTeachers, setExpandedTeachers] = useState<Record<number, boolean>>({});
+  const [tasksByStudent, setTasksByStudent] = useState<Record<number, Task[]>>({});
+  const [tasksLoading, setTasksLoading] = useState<Record<number, boolean>>({});
+  const [tasksError, setTasksError] = useState<Record<number, string>>({});
+  const [answerFormByTask, setAnswerFormByTask] = useState<Record<number, TaskSubmissionInput>>({});
+  const [answerBusyByTask, setAnswerBusyByTask] = useState<Record<number, boolean>>({});
+  const [teacherStudents, setTeacherStudents] = useState<Record<number, Enrollment[]>>({});
+  const [teacherStudentsLoading, setTeacherStudentsLoading] = useState<Record<number, boolean>>({});
+  const [teacherStudentsError, setTeacherStudentsError] = useState<Record<number, string>>({});
+  const [taskFormByStudent, setTaskFormByStudent] = useState<Record<number, TaskCreateInput>>({});
+  const [taskBusyByStudent, setTaskBusyByStudent] = useState<Record<number, boolean>>({});
   const [formState, setFormState] = useState({
     username: "",
     password: "",
@@ -35,6 +54,13 @@ export function RoleListPage({ role, title, subtitle }: RoleListPageProps) {
     gender: "",
     current_academic: "",
     enrolled_status: true,
+  });
+  const [studentFormState, setStudentFormState] = useState({
+    username: "",
+    password: "",
+    email: "",
+    first_name: "",
+    last_name: "",
   });
 
   const isEditing = editingId !== null;
@@ -54,6 +80,80 @@ export function RoleListPage({ role, title, subtitle }: RoleListPageProps) {
   }, [role]);
 
   const canMutate = viewerRole === "admin";
+  const canViewHomework = role === "student" && (viewerRole === "admin" || viewerRole === "teacher" || viewerRole === "student");
+  const canAssignTasks = role === "teacher" && viewerRole === "teacher";
+  const canSubmitAnswers = role === "student" && viewerRole === "student";
+
+  const initTaskForm = useCallback((studentId: number) => {
+    setTaskFormByStudent((prev) => ({
+      ...prev,
+      [studentId]: prev[studentId] || {
+        student_id: studentId,
+        title: "",
+        description: "",
+        due_date: "",
+        deadline: "",
+      },
+    }));
+  }, []);
+
+  const initAnswerForm = useCallback((taskId: number) => {
+    setAnswerFormByTask((prev) => ({
+      ...prev,
+      [taskId]: prev[taskId] || {
+        answer_text: "",
+        answer_file: null,
+      },
+    }));
+  }, []);
+
+  const formatDate = (value: string) => {
+    if (!value) {
+      return "-";
+    }
+    return new Date(value).toLocaleDateString();
+  };
+
+  const loadStudentTasks = useCallback(async (studentId: number, force = false) => {
+    if (!force && (tasksByStudent[studentId] || tasksLoading[studentId])) {
+      return;
+    }
+
+    const token = getAccessToken();
+    if (!token) {
+      router.push("/login");
+      return;
+    }
+
+    setTasksLoading((prev) => ({ ...prev, [studentId]: true }));
+    setTasksError((prev) => ({ ...prev, [studentId]: "" }));
+
+    try {
+      const tasks = await getStudentTasks(token, studentId);
+      const sortedTasks = [...tasks].sort((a, b) => {
+        const left = new Date(a.deadline || a.due_date).getTime();
+        const right = new Date(b.deadline || b.due_date).getTime();
+        return left - right;
+      });
+      setTasksByStudent((prev) => ({ ...prev, [studentId]: sortedTasks }));
+      sortedTasks.forEach((task) => initAnswerForm(task.id));
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Failed to load tasks";
+      setTasksError((prev) => ({ ...prev, [studentId]: message }));
+    } finally {
+      setTasksLoading((prev) => ({ ...prev, [studentId]: false }));
+    }
+  }, [initAnswerForm, router, tasksByStudent, tasksLoading]);
+
+  const toggleStudentTasks = useCallback((studentId: number) => {
+    setExpandedStudents((prev) => {
+      const nextState = !prev[studentId];
+      if (nextState) {
+        loadStudentTasks(studentId);
+      }
+      return { ...prev, [studentId]: nextState };
+    });
+  }, [loadStudentTasks]);
 
   const openCreateModal = () => {
     setEditingId(null);
@@ -70,6 +170,7 @@ export function RoleListPage({ role, title, subtitle }: RoleListPageProps) {
       enrolled_status: true,
     });
     setError("");
+    setSuccessMessage("");
     setIsModalOpen(true);
   };
 
@@ -88,6 +189,7 @@ export function RoleListPage({ role, title, subtitle }: RoleListPageProps) {
       enrolled_status: user.enrolled_status,
     });
     setError("");
+    setSuccessMessage("");
     setIsModalOpen(true);
   };
 
@@ -96,6 +198,41 @@ export function RoleListPage({ role, title, subtitle }: RoleListPageProps) {
       return;
     }
     setIsModalOpen(false);
+  };
+
+  const openStudentCreateModal = (teacherId: number) => {
+    setActiveTeacherId(teacherId);
+    setStudentEditingId(null);
+    setStudentFormState({
+      username: "",
+      password: "",
+      email: "",
+      first_name: "",
+      last_name: "",
+    });
+    setStudentModalError("");
+    setIsStudentModalOpen(true);
+  };
+
+  const openStudentEditModal = (teacherId: number, student: UserProfile) => {
+    setActiveTeacherId(teacherId);
+    setStudentEditingId(student.id);
+    setStudentFormState({
+      username: student.username,
+      password: "",
+      email: student.email || "",
+      first_name: student.first_name || "",
+      last_name: student.last_name || "",
+    });
+    setStudentModalError("");
+    setIsStudentModalOpen(true);
+  };
+
+  const closeStudentModal = () => {
+    if (studentBusy) {
+      return;
+    }
+    setIsStudentModalOpen(false);
   };
 
   const loadUsers = useCallback(async () => {
@@ -108,6 +245,7 @@ export function RoleListPage({ role, title, subtitle }: RoleListPageProps) {
     try {
       const profile = await getMyProfile(token);
       setViewerRole(profile.role);
+      setViewerProfile(profile);
       saveRole(profile.role);
 
       if (!canAccessSection(profile.role, section)) {
@@ -138,6 +276,21 @@ export function RoleListPage({ role, title, subtitle }: RoleListPageProps) {
     loadUsers();
   }, [loadUsers]);
 
+  useEffect(() => {
+    if (viewerRole !== "student" || !viewerProfile || users.length === 0) {
+      return;
+    }
+
+    const studentId = viewerProfile.id;
+    setExpandedStudents((prev) => {
+      if (prev[studentId]) {
+        return prev;
+      }
+      return { ...prev, [studentId]: true };
+    });
+    loadStudentTasks(studentId);
+  }, [loadStudentTasks, users, viewerProfile, viewerRole]);
+
   const onSave = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const token = getAccessToken();
@@ -153,6 +306,7 @@ export function RoleListPage({ role, title, subtitle }: RoleListPageProps) {
 
     setBusy(true);
     setError("");
+    setSuccessMessage("");
 
     try {
       if (isEditing && editingId !== null) {
@@ -189,6 +343,7 @@ export function RoleListPage({ role, title, subtitle }: RoleListPageProps) {
       setIsModalOpen(false);
       setLoading(true);
       await loadUsers();
+      setSuccessMessage(isEditing ? `${roleName} updated and saved to database.` : `${roleName} created and saved to database.`);
     } catch (err) {
       if (err instanceof ApiError && err.status === 401) {
         clearSession();
@@ -200,6 +355,86 @@ export function RoleListPage({ role, title, subtitle }: RoleListPageProps) {
       setError(message);
     } finally {
       setBusy(false);
+    }
+  };
+
+  const onSaveStudent = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const token = getAccessToken();
+    if (!token) {
+      router.push("/login");
+      return;
+    }
+
+    if (!activeTeacherId) {
+      setStudentModalError("Missing teacher context.");
+      return;
+    }
+
+    if (!studentFormState.username || (!studentEditingId && !studentFormState.password)) {
+      setStudentModalError("Username and password are required for new students.");
+      return;
+    }
+
+    setStudentBusy(true);
+    setStudentModalError("");
+
+    try {
+      if (studentEditingId) {
+        const payload: StudentUpdateInput = {
+          id: studentEditingId,
+          username: studentFormState.username,
+          email: studentFormState.email,
+          first_name: studentFormState.first_name,
+          last_name: studentFormState.last_name,
+        };
+        await updateStudentByTeacher(token, payload);
+        setSuccessMessage("Student updated successfully.");
+      } else {
+        const payload: StudentCreateInput = {
+          username: studentFormState.username,
+          password: studentFormState.password,
+          email: studentFormState.email,
+          first_name: studentFormState.first_name,
+          last_name: studentFormState.last_name,
+        };
+        await enrollStudentByTeacher(token, payload);
+        setSuccessMessage("Student enrolled successfully.");
+      }
+
+      setIsStudentModalOpen(false);
+      await loadTeacherStudents(activeTeacherId, true);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Failed to save student";
+      setStudentModalError(message);
+    } finally {
+      setStudentBusy(false);
+    }
+  };
+
+  const onDeleteStudent = async (studentId: number, teacherId: number) => {
+    const token = getAccessToken();
+    if (!token) {
+      router.push("/login");
+      return;
+    }
+
+    const confirmed = window.confirm("Delete this student?");
+    if (!confirmed) {
+      return;
+    }
+
+    setStudentBusy(true);
+    setStudentModalError("");
+    try {
+      await deleteStudentByTeacher(token, studentId);
+      setSuccessMessage("Student deleted successfully.");
+      await loadTeacherStudents(teacherId, true);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Failed to delete student";
+      setStudentModalError(message);
+    } finally {
+      setStudentBusy(false);
     }
   };
 
@@ -221,9 +456,11 @@ export function RoleListPage({ role, title, subtitle }: RoleListPageProps) {
 
     setBusy(true);
     setError("");
+    setSuccessMessage("");
     try {
       await deleteUser(token, id);
       setUsers((prev) => prev.filter((item) => item.id !== id));
+      setSuccessMessage(`${roleName} deleted from database.`);
     } catch (err) {
       if (err instanceof ApiError && err.status === 401) {
         clearSession();
@@ -237,6 +474,122 @@ export function RoleListPage({ role, title, subtitle }: RoleListPageProps) {
       setBusy(false);
     }
   };
+
+  const onCreateTask = async (event: FormEvent<HTMLFormElement>, studentId: number) => {
+    event.preventDefault();
+    const token = getAccessToken();
+    if (!token) {
+      router.push("/login");
+      return;
+    }
+
+    const payload = taskFormByStudent[studentId];
+    if (!payload?.title || !payload?.due_date) {
+      setError("Title and due date are required.");
+      return;
+    }
+
+    setTaskBusyByStudent((prev) => ({ ...prev, [studentId]: true }));
+    setError("");
+    setSuccessMessage("");
+
+    try {
+      await createTask(token, {
+        ...payload,
+        deadline: payload.deadline || payload.due_date,
+      });
+      setSuccessMessage("Task created and assigned.");
+      setTaskFormByStudent((prev) => ({
+        ...prev,
+        [studentId]: {
+          student_id: studentId,
+          title: "",
+          description: "",
+          due_date: "",
+          deadline: "",
+        },
+      }));
+      await loadStudentTasks(studentId, true);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Failed to create task";
+      setError(message);
+    } finally {
+      setTaskBusyByStudent((prev) => ({ ...prev, [studentId]: false }));
+    }
+  };
+
+  const onSubmitAnswer = async (event: FormEvent<HTMLFormElement>, taskId: number, studentId: number) => {
+    event.preventDefault();
+    const token = getAccessToken();
+    if (!token) {
+      router.push("/login");
+      return;
+    }
+
+    const payload = answerFormByTask[taskId];
+    if (!payload?.answer_text && !payload?.answer_file) {
+      setError("Add a text answer or attach a file before submitting.");
+      return;
+    }
+
+    setAnswerBusyByTask((prev) => ({ ...prev, [taskId]: true }));
+    setError("");
+    setSuccessMessage("");
+
+    try {
+      await submitTaskAnswer(token, taskId, payload);
+      setSuccessMessage("Answer submitted successfully.");
+      setAnswerFormByTask((prev) => ({
+        ...prev,
+        [taskId]: {
+          answer_text: "",
+          answer_file: null,
+        },
+      }));
+      await loadStudentTasks(studentId, true);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Failed to submit answer";
+      setError(message);
+    } finally {
+      setAnswerBusyByTask((prev) => ({ ...prev, [taskId]: false }));
+    }
+  };
+
+  const loadTeacherStudents = useCallback(async (teacherId: number, force = false) => {
+    if (!force && (teacherStudents[teacherId] || teacherStudentsLoading[teacherId])) {
+      return;
+    }
+
+    const token = getAccessToken();
+    if (!token) {
+      router.push("/login");
+      return;
+    }
+
+    setTeacherStudentsLoading((prev) => ({ ...prev, [teacherId]: true }));
+    setTeacherStudentsError((prev) => ({ ...prev, [teacherId]: "" }));
+
+    try {
+      const enrollments = await getTeacherStudents(token, teacherId);
+      setTeacherStudents((prev) => ({ ...prev, [teacherId]: enrollments }));
+      enrollments.forEach((enrollment) => initTaskForm(enrollment.student.id));
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Failed to load students";
+      setTeacherStudentsError((prev) => ({ ...prev, [teacherId]: message }));
+    } finally {
+      setTeacherStudentsLoading((prev) => ({ ...prev, [teacherId]: false }));
+    }
+  }, [initTaskForm, router, teacherStudents, teacherStudentsLoading]);
+
+  const toggleTeacherStudents = useCallback((teacherId: number) => {
+    setExpandedTeachers((prev) => {
+      const nextState = !prev[teacherId];
+      if (nextState) {
+        loadTeacherStudents(teacherId);
+      }
+      return { ...prev, [teacherId]: nextState };
+    });
+  }, [loadTeacherStudents]);
 
   return (
     <AppShell title={title} subtitle={subtitle} currentRole={viewerRole}>
@@ -253,6 +606,11 @@ export function RoleListPage({ role, title, subtitle }: RoleListPageProps) {
         </div>
       )}
 
+      {!loading && successMessage && (
+        <div className="card mb-4 border-emerald-200 bg-emerald-50 p-4 text-emerald-800">{successMessage}</div>
+      )}
+
+
       {loading && <div className="card p-6 text-(--text-soft)">Loading data...</div>}
       {!loading && error && (
         <div className="card border-red-200 bg-red-50 p-6 text-(--danger)">{error}</div>
@@ -262,14 +620,17 @@ export function RoleListPage({ role, title, subtitle }: RoleListPageProps) {
       )}
 
       {!loading && !error && users.length > 0 && (
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+        <div className={`grid gap-4 ${role === "student" ? "md:grid-cols-2 xl:grid-cols-2" : "md:grid-cols-2 xl:grid-cols-3"}`}>
           {users.map((user, idx) => {
             const photo = toPhotoUrl(user.profile_photo);
             const fullName = `${user.first_name} ${user.last_name}`.trim();
+            const isOwnTeacherCard = viewerProfile?.id === user.id;
+            const canAssignForTeacher = canAssignTasks && isOwnTeacherCard;
+            const canViewHomeworkForUser = canViewHomework && (viewerRole !== "student" || viewerProfile?.id === user.id);
             return (
               <article
                 key={user.id}
-                className="card reveal space-y-4 p-5"
+                className={`card reveal space-y-4 p-5 ${role === "teacher" ? "md:col-span-2 xl:col-span-3" : ""}`}
                 style={{ animationDelay: `${idx * 70}ms` }}
               >
                 <div className="flex items-center gap-3">
@@ -307,27 +668,378 @@ export function RoleListPage({ role, title, subtitle }: RoleListPageProps) {
                   <div className="flex justify-between gap-3">
                     <dt className="text-(--text-soft)">Status</dt>
                     <dd
-                      className={`rounded-full px-2 py-0.5 text-xs font-semibold ${
-                        user.enrolled_status
-                          ? "bg-emerald-100 text-emerald-800"
-                          : "bg-red-100 text-red-800"
-                      }`}
+                      className={`rounded-full px-2 py-0.5 text-xs font-semibold ${user.enrolled_status
+                        ? "bg-emerald-100 text-emerald-800"
+                        : "bg-red-100 text-red-800"
+                        }`}
                     >
                       {user.enrolled_status ? "Enrolled" : "Not Enrolled"}
                     </dd>
                   </div>
                 </dl>
 
+                {role === "teacher" && (
+                  <div className="rounded-lg border border-(--line) bg-(--surface-muted) p-3">
+                    <button
+                      type="button"
+                      onClick={() => toggleTeacherStudents(user.id)}
+                      className="flex w-full items-center justify-between text-sm font-semibold"
+                    >
+                      Students
+                      {expandedTeachers[user.id] ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                    </button>
+
+                    {expandedTeachers[user.id] && (
+                      <div className="mt-3 space-y-3">
+                        {teacherStudentsLoading[user.id] && (
+                          <div className="text-sm text-(--text-soft)">Loading students...</div>
+                        )}
+                        {!teacherStudentsLoading[user.id] && teacherStudentsError[user.id] && (
+                          <div className="text-sm text-(--danger)">{teacherStudentsError[user.id]}</div>
+                        )}
+                        {!teacherStudentsLoading[user.id] && !teacherStudentsError[user.id] && (
+                          <div className="space-y-2">
+                            {canAssignForTeacher && (
+                              <button
+                                type="button"
+                                onClick={() => openStudentCreateModal(user.id)}
+                                className="w-full rounded-lg border border-(--line) bg-(--surface) px-3 py-2 text-xs font-semibold"
+                              >
+                                Add Student
+                              </button>
+                            )}
+                            {(teacherStudents[user.id] || []).length === 0 && (
+                              <div className="text-sm text-(--text-soft)">No students enrolled yet.</div>
+                            )}
+                            {(teacherStudents[user.id] || []).map((enrollment) => {
+                              const student = enrollment.student;
+                              const form = taskFormByStudent[student.id] || {
+                                student_id: student.id,
+                                title: "",
+                                description: "",
+                                due_date: "",
+                                deadline: "",
+                              };
+                              const studentTasks = tasksByStudent[student.id] || [];
+                              const isTasksExpanded = !!expandedStudents[student.id];
+                              return (
+                                <div key={enrollment.id} className="rounded-md border border-(--line) bg-white px-3 py-2">
+                                  <div className="mb-2">
+                                    <p className="text-sm font-semibold">{student.first_name} {student.last_name}</p>
+                                    <p className="text-xs text-(--text-soft)">@{student.username}</p>
+                                  </div>
+
+                                  {canAssignForTeacher && (
+                                    <div className="mb-2 flex flex-wrap gap-2">
+                                      <button
+                                        type="button"
+                                        onClick={() => openStudentEditModal(user.id, student)}
+                                        className="rounded-lg border border-(--line) bg-(--surface) px-2 py-1 text-[11px] font-semibold"
+                                      >
+                                        Edit Student
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={() => onDeleteStudent(student.id, user.id)}
+                                        className="rounded-lg border border-red-200 bg-red-50 px-2 py-1 text-[11px] font-semibold text-red-700"
+                                      >
+                                        Delete Student
+                                      </button>
+                                    </div>
+                                  )}
+
+                                  <button
+                                    type="button"
+                                    onClick={() => toggleStudentTasks(student.id)}
+                                    className="mb-2 inline-flex items-center gap-2 rounded-lg border border-(--line) bg-(--surface) px-3 py-1.5 text-xs font-semibold"
+                                  >
+                                    {isTasksExpanded ? "Hide Tasks" : "View Tasks"}
+                                    {isTasksExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                                  </button>
+
+                                  {isTasksExpanded && (
+                                    <div className="mb-3 space-y-2">
+                                      {tasksLoading[student.id] && (
+                                        <div className="text-xs text-(--text-soft)">Loading tasks...</div>
+                                      )}
+                                      {!tasksLoading[student.id] && tasksError[student.id] && (
+                                        <div className="text-xs text-(--danger)">{tasksError[student.id]}</div>
+                                      )}
+                                      {!tasksLoading[student.id] && !tasksError[student.id] && studentTasks.length === 0 && (
+                                        <div className="text-xs text-(--text-soft)">No tasks assigned yet.</div>
+                                      )}
+                                      {!tasksLoading[student.id] && !tasksError[student.id] && studentTasks.length > 0 && (
+                                        <div className="space-y-2">
+                                          {studentTasks.map((task) => {
+                                            const fileUrl = task.answer_file ? toPhotoUrl(task.answer_file) : null;
+                                            return (
+                                              <div key={task.id} className="rounded-md border border-(--line) bg-(--surface-muted) px-3 py-2">
+                                                <div className="flex items-start justify-between gap-2">
+                                                  <div>
+                                                    <p className="text-xs font-semibold">{task.title}</p>
+                                                    {task.description && (
+                                                      <p className="text-[11px] text-(--text-soft)">{task.description}</p>
+                                                    )}
+                                                  </div>
+                                                  <span
+                                                    className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${task.is_completed
+                                                      ? "bg-emerald-100 text-emerald-700"
+                                                      : "bg-amber-100 text-amber-700"
+                                                      }`}
+                                                  >
+                                                    {task.is_completed ? "Done" : "Pending"}
+                                                  </span>
+                                                </div>
+                                                <div className="mt-1 grid gap-1 text-[11px] text-(--text-soft) sm:grid-cols-2">
+                                                  <p>Due: {formatDate(task.due_date)}</p>
+                                                  <p>Deadline: {formatDate(task.deadline || task.due_date)}</p>
+                                                  <p>Submitted: {task.submitted_at ? formatDate(task.submitted_at) : "-"}</p>
+                                                </div>
+                                                {task.answer_text && (
+                                                  <p className="mt-2 text-[11px] text-(--text-soft)">
+                                                    Answer: {task.answer_text}
+                                                  </p>
+                                                )}
+                                                {fileUrl && (
+                                                  <a
+                                                    href={fileUrl}
+                                                    target="_blank"
+                                                    rel="noreferrer"
+                                                    className="mt-2 inline-flex text-[11px] font-semibold text-(--brand-strong)"
+                                                  >
+                                                    View uploaded file
+                                                  </a>
+                                                )}
+                                              </div>
+                                            );
+                                          })}
+                                        </div>
+                                      )}
+                                    </div>
+                                  )}
+
+                                  {canAssignForTeacher ? (
+                                    <form onSubmit={(event) => onCreateTask(event, student.id)} className="space-y-2">
+                                      <label className="text-xs font-semibold text-(--text-soft)">
+                                        Task title
+                                        <input
+                                          value={form.title}
+                                          onChange={(event) =>
+                                            setTaskFormByStudent((prev) => ({
+                                              ...prev,
+                                              [student.id]: { ...form, title: event.target.value },
+                                            }))
+                                          }
+                                          className="mt-1 w-full rounded-lg border border-(--line) bg-white px-3 py-2 text-sm"
+                                          required
+                                        />
+                                      </label>
+                                      <label className="text-xs font-semibold text-(--text-soft)">
+                                        Description
+                                        <textarea
+                                          value={form.description}
+                                          onChange={(event) =>
+                                            setTaskFormByStudent((prev) => ({
+                                              ...prev,
+                                              [student.id]: { ...form, description: event.target.value },
+                                            }))
+                                          }
+                                          className="mt-1 w-full rounded-lg border border-(--line) bg-white px-3 py-2 text-sm"
+                                          rows={2}
+                                        />
+                                      </label>
+                                      <div className="grid gap-2 sm:grid-cols-2">
+                                        <label className="text-xs font-semibold text-(--text-soft)">
+                                          Due date
+                                          <input
+                                            type="datetime-local"
+                                            value={form.due_date}
+                                            onChange={(event) =>
+                                              setTaskFormByStudent((prev) => ({
+                                                ...prev,
+                                                [student.id]: { ...form, due_date: event.target.value },
+                                              }))
+                                            }
+                                            className="mt-1 w-full rounded-lg border border-(--line) bg-white px-3 py-2 text-sm"
+                                            required
+                                          />
+                                        </label>
+                                        <label className="text-xs font-semibold text-(--text-soft)">
+                                          Deadline
+                                          <input
+                                            type="datetime-local"
+                                            value={form.deadline || ""}
+                                            onChange={(event) =>
+                                              setTaskFormByStudent((prev) => ({
+                                                ...prev,
+                                                [student.id]: { ...form, deadline: event.target.value },
+                                              }))
+                                            }
+                                            className="mt-1 w-full rounded-lg border border-(--line) bg-white px-3 py-2 text-sm"
+                                          />
+                                        </label>
+                                      </div>
+                                      <button
+                                        type="submit"
+                                        disabled={taskBusyByStudent[student.id]}
+                                        className="btn-primary w-full rounded-lg px-3 py-2 text-sm font-semibold disabled:opacity-60"
+                                      >
+                                        {taskBusyByStudent[student.id] ? "Assigning..." : "Assign Task"}
+                                      </button>
+                                    </form>
+                                  ) : (
+                                    <p className="text-xs text-(--text-soft)">Tasks can be assigned only by the selected teacher.</p>
+                                  )}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {canViewHomeworkForUser && (
+                  <div className="rounded-lg border border-(--line) bg-(--surface-muted) p-3">
+                    <button
+                      type="button"
+                      onClick={() => toggleStudentTasks(user.id)}
+                      className="flex w-full items-center justify-between text-sm font-semibold"
+                    >
+                      Homework
+                      {expandedStudents[user.id] ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                    </button>
+
+                    {expandedStudents[user.id] && (
+                      <div className="mt-3 space-y-2">
+                        {tasksLoading[user.id] && (
+                          <div className="text-sm text-(--text-soft)">Loading tasks...</div>
+                        )}
+                        {!tasksLoading[user.id] && tasksError[user.id] && (
+                          <div className="text-sm text-(--danger)">{tasksError[user.id]}</div>
+                        )}
+                        {!tasksLoading[user.id] && !tasksError[user.id] && (
+                          <div className="space-y-2">
+                            {(tasksByStudent[user.id] || []).length === 0 && (
+                              <div className="text-sm text-(--text-soft)">No homework assigned yet.</div>
+                            )}
+                            {(tasksByStudent[user.id] || []).map((task) => {
+                              const answerForm = answerFormByTask[task.id] || { answer_text: "", answer_file: null };
+                              const fileUrl = task.answer_file ? toPhotoUrl(task.answer_file) : null;
+                              return (
+                                <div key={task.id} className="rounded-md border border-(--line) bg-white px-3 py-2">
+                                  <div className="flex items-start justify-between gap-2">
+                                    <div>
+                                      <p className="text-sm font-semibold">{task.title}</p>
+                                      {task.description && (
+                                        <p className="text-xs text-(--text-soft)">{task.description}</p>
+                                      )}
+                                    </div>
+                                    <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${task.is_completed
+                                      ? "bg-emerald-100 text-emerald-700"
+                                      : "bg-amber-100 text-amber-700"
+                                      }`}
+                                    >
+                                      {task.is_completed ? "Done" : "Pending"}
+                                    </span>
+                                  </div>
+                                  <div className="mt-2 grid gap-1 text-xs text-(--text-soft) sm:grid-cols-2">
+                                    <p>Teacher: {task.teacher_username || "-"}</p>
+                                    <p>Due: {formatDate(task.due_date)}</p>
+                                    <p>Deadline: {formatDate(task.deadline || task.due_date)}</p>
+                                    <p>Assigned: {formatDate(task.created_at)}</p>
+                                    <p>Submitted: {task.submitted_at ? formatDate(task.submitted_at) : "-"}</p>
+                                    <p>Status: {task.is_completed ? "Completed" : "Pending"}</p>
+                                  </div>
+                                  {task.answer_text && (
+                                    <p className="mt-2 text-xs text-(--text-soft)">Your answer: {task.answer_text}</p>
+                                  )}
+                                  {fileUrl && (
+                                    <a
+                                      href={fileUrl}
+                                      target="_blank"
+                                      rel="noreferrer"
+                                      className="mt-2 inline-flex text-xs font-semibold text-(--brand-strong)"
+                                    >
+                                      View uploaded file
+                                    </a>
+                                  )}
+                                  {canSubmitAnswers && viewerProfile?.id === user.id && (
+                                    !task.is_completed ? (
+                                      <form
+                                        onSubmit={(event) => onSubmitAnswer(event, task.id, user.id)}
+                                        className="mt-3 space-y-2"
+                                      >
+                                        <label className="text-xs font-semibold text-(--text-soft)">
+                                          Your answer (optional)
+                                          <textarea
+                                            value={answerForm.answer_text}
+                                            onChange={(event) =>
+                                              setAnswerFormByTask((prev) => ({
+                                                ...prev,
+                                                [task.id]: { ...answerForm, answer_text: event.target.value },
+                                              }))
+                                            }
+                                            className="mt-1 w-full rounded-lg border border-(--line) bg-white px-3 py-2 text-sm"
+                                            rows={2}
+                                          />
+                                        </label>
+                                        <label className="text-xs font-semibold text-(--text-soft)">
+                                          Upload file
+                                          <input
+                                            type="file"
+                                            onChange={(event) =>
+                                              setAnswerFormByTask((prev) => ({
+                                                ...prev,
+                                                [task.id]: { ...answerForm, answer_file: event.target.files?.[0] || null },
+                                              }))
+                                            }
+                                            className="mt-1 w-full rounded-lg border border-(--line) bg-white px-3 py-2 text-sm"
+                                          />
+                                        </label>
+                                        <button
+                                          type="submit"
+                                          disabled={answerBusyByTask[task.id]}
+                                          className="btn-primary w-full rounded-lg px-3 py-2 text-sm font-semibold disabled:opacity-60"
+                                        >
+                                          {answerBusyByTask[task.id] ? "Submitting..." : "Submit Answer"}
+                                        </button>
+                                      </form>
+                                    ) : (
+                                      <p className="mt-3 text-xs font-semibold text-emerald-700">Answer submitted.</p>
+                                    )
+                                  )}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
+
                 <div className="flex gap-2 pt-1">
                   {canMutate && (
                     <>
-                      <button
-                        type="button"
-                        onClick={() => openEditModal(user)}
-                        className="inline-flex items-center gap-1 rounded-lg border border-(--line) bg-(--surface) px-3 py-1.5 text-sm font-medium transition hover:bg-(--surface-muted)"
-                      >
-                        <Pencil size={14} /> Edit
-                      </button>
+                      {role === "student" ? (
+                        <button
+                          type="button"
+                          onClick={() => openEditModal(user)}
+                          className="inline-flex items-center gap-1 rounded-lg border border-(--line) bg-(--surface) px-3 py-1.5 text-sm font-medium transition hover:bg-(--surface-muted)"
+                        >
+                          <Pencil size={14} /> Update Info
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => openEditModal(user)}
+                          className="inline-flex items-center gap-1 rounded-lg border border-(--line) bg-(--surface) px-3 py-1.5 text-sm font-medium transition hover:bg-(--surface-muted)"
+                        >
+                          <Pencil size={14} /> Edit
+                        </button>
+                      )}
                       <button
                         type="button"
                         onClick={() => onDelete(user.id)}
@@ -357,6 +1069,12 @@ export function RoleListPage({ role, title, subtitle }: RoleListPageProps) {
                 <X size={18} />
               </button>
             </div>
+
+            {error && (
+              <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-(--danger)">
+                {error}
+              </div>
+            )}
 
             <form onSubmit={onSave} className="grid gap-3 sm:grid-cols-2">
               <label className="text-sm font-medium">
@@ -477,6 +1195,109 @@ export function RoleListPage({ role, title, subtitle }: RoleListPageProps) {
                   className="btn-primary rounded-lg px-4 py-2 text-sm font-semibold disabled:opacity-60"
                 >
                   {busy ? "Saving..." : isEditing ? "Save Changes" : "Create"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {isStudentModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4">
+          <div className="card w-full max-w-xl p-6">
+            <div className="mb-4 flex items-start justify-between gap-4">
+              <div>
+                <h3 className="text-xl font-semibold">
+                  {studentEditingId ? "Edit Student" : "Add Student"}
+                </h3>
+                <p className="text-sm text-(--text-soft)">Manage only your enrolled students.</p>
+              </div>
+              <button type="button" onClick={closeStudentModal} className="rounded-md p-1 text-(--text-soft) hover:bg-(--surface-muted)">
+                <X size={18} />
+              </button>
+            </div>
+
+            {studentModalError && (
+              <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-(--danger)">
+                {studentModalError}
+              </div>
+            )}
+
+            <form onSubmit={onSaveStudent} className="grid gap-3 sm:grid-cols-2">
+              <label className="text-sm font-medium">
+                Username
+                <input
+                  required
+                  value={studentFormState.username}
+                  onChange={(event) =>
+                    setStudentFormState((prev) => ({ ...prev, username: event.target.value }))
+                  }
+                  className="mt-1 w-full rounded-lg border border-(--line) bg-white px-3 py-2"
+                />
+              </label>
+
+              {!studentEditingId && (
+                <label className="text-sm font-medium">
+                  Password
+                  <input
+                    required
+                    type="password"
+                    value={studentFormState.password}
+                    onChange={(event) =>
+                      setStudentFormState((prev) => ({ ...prev, password: event.target.value }))
+                    }
+                    className="mt-1 w-full rounded-lg border border-(--line) bg-white px-3 py-2"
+                  />
+                </label>
+              )}
+
+              <label className="text-sm font-medium">
+                Email
+                <input
+                  value={studentFormState.email}
+                  onChange={(event) =>
+                    setStudentFormState((prev) => ({ ...prev, email: event.target.value }))
+                  }
+                  className="mt-1 w-full rounded-lg border border-(--line) bg-white px-3 py-2"
+                />
+              </label>
+
+              <label className="text-sm font-medium">
+                First Name
+                <input
+                  value={studentFormState.first_name}
+                  onChange={(event) =>
+                    setStudentFormState((prev) => ({ ...prev, first_name: event.target.value }))
+                  }
+                  className="mt-1 w-full rounded-lg border border-(--line) bg-white px-3 py-2"
+                />
+              </label>
+
+              <label className="text-sm font-medium">
+                Last Name
+                <input
+                  value={studentFormState.last_name}
+                  onChange={(event) =>
+                    setStudentFormState((prev) => ({ ...prev, last_name: event.target.value }))
+                  }
+                  className="mt-1 w-full rounded-lg border border-(--line) bg-white px-3 py-2"
+                />
+              </label>
+
+              <div className="sm:col-span-2 mt-2 flex justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={closeStudentModal}
+                  className="rounded-lg border border-(--line) px-4 py-2 text-sm font-semibold"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={studentBusy}
+                  className="btn-primary rounded-lg px-4 py-2 text-sm font-semibold disabled:opacity-60"
+                >
+                  {studentBusy ? "Saving..." : studentEditingId ? "Save Changes" : "Create"}
                 </button>
               </div>
             </form>

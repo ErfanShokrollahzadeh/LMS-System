@@ -1,5 +1,11 @@
+import logging
+from pathlib import Path
+
+from django.conf import settings
+from django.db import IntegrityError
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
+from rest_framework.parsers import FormParser, MultiPartParser
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.response import Response
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
@@ -17,6 +23,7 @@ from .serializers import (
 )
 
 User = get_user_model()
+logger = logging.getLogger(__name__)
 
 
 class CustomTokenObtainPairView(TokenObtainPairView):
@@ -39,7 +46,7 @@ class CustomTokenObtainPairView(TokenObtainPairView):
 
 
 class StudentViewSet(viewsets.ModelViewSet):
-    queryset = User.objects.all()
+    queryset = User.objects.all().order_by("-id")
     serializer_class = UserSerializer
     permission_classes = [IsAuthenticated]
 
@@ -59,6 +66,26 @@ class StudentViewSet(viewsets.ModelViewSet):
             )
         return None
 
+    def _ensure_can_manage_user(self, request, target_user):
+        if self._is_admin(request.user):
+            return None
+
+        if request.user.role == User.IS_TEACHER and target_user.role == User.IS_STUDENT:
+            if Enrollment.objects.filter(
+                teacher=request.user,
+                student=target_user,
+            ).exists():
+                return None
+            return Response(
+                {"detail": "You can only manage your enrolled students."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        return Response(
+            {"detail": "Only managers can manage users."},
+            status=status.HTTP_403_FORBIDDEN,
+        )
+
     def create(self, request, *args, **kwargs):
         denied = self._ensure_admin(request)
         if denied:
@@ -66,26 +93,56 @@ class StudentViewSet(viewsets.ModelViewSet):
 
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        user = serializer.save(created_by=request.user)
+        try:
+            user = serializer.save(created_by=request.user)
+        except IntegrityError:
+            return Response(
+                {"detail": "Unable to save user due to duplicate or invalid database values."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        except Exception:
+            logger.exception("Unexpected error while creating user")
+            return Response(
+                {"detail": "Unexpected error while creating user."},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
         return Response(UserSerializer(user).data, status=status.HTTP_201_CREATED)
 
     def update(self, request, *args, **kwargs):
-        denied = self._ensure_admin(request)
+        instance = self.get_object()
+        denied = self._ensure_can_manage_user(request, instance)
         if denied:
             return denied
-        return super().update(request, *args, **kwargs)
+        data = request.data.copy()
+        if not self._is_admin(request.user):
+            data.pop("role", None)
+
+        serializer = self.get_serializer(instance, data=data)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response(serializer.data)
 
     def partial_update(self, request, *args, **kwargs):
-        denied = self._ensure_admin(request)
+        instance = self.get_object()
+        denied = self._ensure_can_manage_user(request, instance)
         if denied:
             return denied
-        return super().partial_update(request, *args, **kwargs)
+        data = request.data.copy()
+        if not self._is_admin(request.user):
+            data.pop("role", None)
+
+        serializer = self.get_serializer(instance, data=data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response(serializer.data)
 
     def destroy(self, request, *args, **kwargs):
-        denied = self._ensure_admin(request)
+        instance = self.get_object()
+        denied = self._ensure_can_manage_user(request, instance)
         if denied:
             return denied
-        return super().destroy(request, *args, **kwargs)
+        instance.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
     @action(detail=False, methods=["get"])
     def me(self, request):
@@ -137,7 +194,19 @@ class StudentViewSet(viewsets.ModelViewSet):
         data["role"] = User.IS_TEACHER
         serializer = UserCreateSerializer(data=data)
         if serializer.is_valid():
-            user = serializer.save(created_by=request.user)
+            try:
+                user = serializer.save(created_by=request.user)
+            except IntegrityError:
+                return Response(
+                    {"detail": "Unable to save teacher due to duplicate or invalid database values."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            except Exception:
+                logger.exception("Unexpected error while enrolling teacher")
+                return Response(
+                    {"detail": "Unexpected error while enrolling teacher."},
+                    status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                )
             return Response(
                 UserSerializer(user).data, status=status.HTTP_201_CREATED
             )
@@ -166,7 +235,19 @@ class StudentViewSet(viewsets.ModelViewSet):
         data["role"] = User.IS_STUDENT
         serializer = UserCreateSerializer(data=data)
         if serializer.is_valid():
-            student = serializer.save(created_by=request.user)
+            try:
+                student = serializer.save(created_by=request.user)
+            except IntegrityError:
+                return Response(
+                    {"detail": "Unable to save student due to duplicate or invalid database values."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            except Exception:
+                logger.exception("Unexpected error while enrolling student")
+                return Response(
+                    {"detail": "Unexpected error while enrolling student."},
+                    status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                )
             enrollment = Enrollment.objects.create(
                 teacher=request.user, student=student
             )
@@ -194,9 +275,20 @@ class EnrollmentViewSet(viewsets.ModelViewSet):
         Teachers see their enrolled students.
         """
         user = self.request.user
-        if user.role == User.IS_TEACHER:
-            return Enrollment.objects.filter(teacher=user)
-        return Enrollment.objects.none()
+        if user.role == User.IS_ADMIN or user.is_superuser:
+            queryset = Enrollment.objects.all()
+        elif user.role == User.IS_TEACHER:
+            queryset = Enrollment.objects.filter(teacher=user)
+        else:
+            return Enrollment.objects.none()
+
+        teacher_id = self.request.query_params.get("teacher_id")
+        if teacher_id:
+            if user.role == User.IS_TEACHER and str(user.id) != str(teacher_id):
+                return Enrollment.objects.none()
+            queryset = queryset.filter(teacher_id=teacher_id)
+
+        return queryset
 
     @action(detail=False, methods=["post"], permission_classes=[IsAuthenticated])
     def enroll_existing_student(self, request):
@@ -267,10 +359,21 @@ class TaskViewSet(viewsets.ModelViewSet):
         """
         user = self.request.user
         if user.role == User.IS_TEACHER:
-            return Task.objects.filter(teacher=user)
+            queryset = Task.objects.filter(teacher=user)
         elif user.role == User.IS_STUDENT:
-            return Task.objects.filter(student=user)
-        return Task.objects.none()
+            queryset = Task.objects.filter(student=user)
+        elif user.role == User.IS_ADMIN or user.is_superuser:
+            queryset = Task.objects.all()
+        else:
+            return Task.objects.none()
+
+        student_id = self.request.query_params.get("student_id")
+        if student_id:
+            if user.role == User.IS_STUDENT and str(user.id) != str(student_id):
+                return Task.objects.none()
+            queryset = queryset.filter(student_id=student_id)
+
+        return queryset.order_by("deadline", "due_date")
 
     def create(self, request, *args, **kwargs):
         """
@@ -280,7 +383,8 @@ class TaskViewSet(viewsets.ModelViewSet):
                 "student_id": 5,
                 "title": "Math Homework",
                 "description": "Chapter 5 problems",
-                "due_date": "2026-05-01T10:00:00Z"
+                "due_date": "2026-05-01T10:00:00Z",
+                "deadline": "2026-05-02T10:00:00Z"
             }
         """
         if request.user.role != User.IS_TEACHER:
@@ -372,14 +476,20 @@ class TaskViewSet(viewsets.ModelViewSet):
             status=status.HTTP_204_NO_CONTENT,
         )
 
-    @action(detail=True, methods=["patch"], permission_classes=[IsAuthenticated])
+    @action(
+        detail=True,
+        methods=["patch"],
+        permission_classes=[IsAuthenticated],
+        parser_classes=[MultiPartParser, FormParser],
+    )
     def submit_task(self, request, pk=None):
         """
-        Student only: Mark task as completed.
+        Student only: Submit task answer with optional file upload.
         Request:
             PATCH /api/tasks/{id}/submit_task/
             {
-                "is_completed": true
+                "answer_text": "...",
+                "answer_file": <file>
             }
         """
         task = self.get_object()
@@ -390,11 +500,25 @@ class TaskViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_403_FORBIDDEN,
             )
 
+        if "answer_file" in request.FILES:
+            upload_dir = Path(settings.MEDIA_ROOT) / "task_submissions"
+            upload_dir.mkdir(parents=True, exist_ok=True)
+
         serializer = StudentTaskSubmissionSerializer(
             task, data=request.data, partial=True
         )
         if serializer.is_valid():
-            serializer.save()
+            try:
+                serializer.save(
+                    is_completed=True,
+                    submitted_at=timezone.now(),
+                )
+            except Exception:
+                logger.exception("Failed to submit task answer")
+                return Response(
+                    {"detail": "Unable to upload task answer. Please try again."},
+                    status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                )
             return Response(TaskSerializer(task).data)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 

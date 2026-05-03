@@ -378,7 +378,30 @@ Access: `http://127.0.0.1:8000/admin/`
 **Fix:**
 
 ```bash
-pip install -r requirements.txt
+python3 -m pip install -r requirements.txt
+```
+
+### Issue: "No module named 'corsheaders'"
+
+**Fix:**
+
+Install dependencies with the same Python executable used to run Django:
+
+```bash
+python3 -m pip install -r requirements.txt
+python3 manage.py runserver
+```
+
+### Issue: "connect ECONNREFUSED 127.0.0.1:8000"
+
+**Fix:**
+
+Make sure backend is running before starting frontend, or point frontend to the correct backend URL:
+
+```bash
+python3 manage.py runserver
+# in frontend shell (if backend uses a different port):
+DJANGO_BACKEND_URL=http://127.0.0.1:8001 npm run dev
 ```
 
 ### Issue: "CORS not working"

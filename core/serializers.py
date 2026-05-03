@@ -92,19 +92,26 @@ class TaskSerializer(serializers.ModelSerializer):
             "student",
             "student_username",
             "due_date",
+            "deadline",
             "is_completed",
+            "answer_text",
+            "answer_file",
+            "submitted_at",
             "created_at",
         )
         read_only_fields = ("id", "created_at", "teacher", "student")
 
 
 class TaskCreateUpdateSerializer(serializers.ModelSerializer):
+    deadline = serializers.DateTimeField(required=False)
+
     class Meta:
         model = Task
-        fields = ("title", "description", "due_date", "is_completed")
+        fields = ("title", "description", "due_date",
+                  "deadline", "is_completed")
 
 
 class StudentTaskSubmissionSerializer(serializers.ModelSerializer):
     class Meta:
         model = Task
-        fields = ("is_completed",)
+        fields = ("answer_text", "answer_file", "is_completed")
