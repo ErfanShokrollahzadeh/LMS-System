@@ -240,3 +240,4 @@ Possible next upgrades:
 ## License
 
 Set a project license before production use (for example, MIT).
+New updates will com soon!
