@@ -24,6 +24,7 @@ from core.views import health
 
 urlpatterns = [
     path("admin/", admin.site.urls),
+    path("admin", RedirectView.as_view(url="/admin/", permanent=False)),
     path("", RedirectView.as_view(url="http://127.0.0.1:3000/", permanent=False)),
     path(
         "login",

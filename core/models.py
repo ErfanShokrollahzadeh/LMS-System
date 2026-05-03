@@ -122,11 +122,19 @@ class Task(models.Model):
         limit_choices_to={"role": User.IS_STUDENT},
     )
     due_date = models.DateTimeField()
+    deadline = models.DateTimeField()
     is_completed = models.BooleanField(default=False)
+    answer_text = models.TextField(blank=True)
+    answer_file = models.FileField(
+        upload_to="task_submissions/",
+        null=True,
+        blank=True,
+    )
+    submitted_at = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
-        ordering = ["due_date"]
+        ordering = ["deadline", "due_date"]
 
     def clean(self):
         if self.teacher.role != User.IS_TEACHER:
@@ -141,6 +149,8 @@ class Task(models.Model):
                 "Teacher can assign tasks only to enrolled students.")
 
     def save(self, *args, **kwargs):
+        if not self.deadline:
+            self.deadline = self.due_date
         self.full_clean()
         super().save(*args, **kwargs)
 

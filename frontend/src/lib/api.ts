@@ -1,4 +1,10 @@
 import type {
+  Enrollment,
+  Task,
+  TaskCreateInput,
+  TaskSubmissionInput,
+  StudentCreateInput,
+  StudentUpdateInput,
   TokenPair,
   UserCreateInput,
   UserProfile,
@@ -6,7 +12,9 @@ import type {
   UserUpdateInput,
 } from "@/lib/types";
 
-const API_PREFIX = "/backend";
+const API_PREFIX = process.env.NEXT_PUBLIC_API_PREFIX || "/backend";
+const DIRECT_BACKEND_URL =
+  process.env.NEXT_PUBLIC_DJANGO_BACKEND_URL || process.env.DJANGO_BACKEND_URL || "http://127.0.0.1:8000";
 
 type PaginatedResponse<T> = {
   results: T[];
@@ -22,10 +30,84 @@ export class ApiError extends Error {
   }
 }
 
+function isAbsoluteUrl(url: string) {
+  return /^https?:\/\//i.test(url);
+}
+
+function apiUrl(path: string) {
+  if (isAbsoluteUrl(API_PREFIX)) {
+    const normalizedBase = API_PREFIX.endsWith("/")
+      ? API_PREFIX.slice(0, -1)
+      : API_PREFIX;
+    const normalizedPath = path.startsWith("/") ? path : `/${path}`;
+    return `${normalizedBase}${normalizedPath}`;
+  }
+  return `${API_PREFIX}${path}`;
+}
+
+function normalizeApiPath(path: string) {
+  if (!path.startsWith("/api/")) {
+    return path;
+  }
+  const [base, query] = path.split("?", 2);
+  if (base.endsWith("/")) {
+    return path;
+  }
+  return query ? `${base}/?${query}` : `${base}/`;
+}
+
+function directApiUrl(path: string) {
+  const normalizedBase = DIRECT_BACKEND_URL.endsWith("/")
+    ? DIRECT_BACKEND_URL.slice(0, -1)
+    : DIRECT_BACKEND_URL;
+  const normalizedPath = path.startsWith("/") ? path : `/${path}`;
+  return `${normalizedBase}${normalizedPath}`;
+}
+
+async function apiFetch(path: string, init?: RequestInit) {
+  const normalizedPath = normalizeApiPath(path);
+  try {
+    return await fetch(apiUrl(normalizedPath), init);
+  } catch {
+    if (!isAbsoluteUrl(API_PREFIX)) {
+      try {
+        return await fetch(directApiUrl(normalizedPath), init);
+      } catch {
+        // Fall through to final connectivity error.
+      }
+    }
+
+    throw new ApiError(
+      `Unable to reach backend API. Tried ${apiUrl(normalizedPath)}${!isAbsoluteUrl(API_PREFIX) ? ` and ${directApiUrl(normalizedPath)}` : ""}. Make sure the backend is running, or set NEXT_PUBLIC_API_PREFIX / NEXT_PUBLIC_DJANGO_BACKEND_URL correctly.`,
+      0
+    );
+  }
+}
+
 async function parseJson(response: Response) {
-  const body = await response.json().catch(() => ({}));
+  const body = await response.json().catch(async () => {
+    const text = await response.text().catch(() => "");
+    return { message: text || response.statusText };
+  });
   if (!response.ok) {
-    const message = body?.detail || body?.message || "Request failed";
+    const message =
+      body?.detail ||
+      body?.message ||
+      (typeof body === "object" && body !== null
+        ? Object.entries(body)
+            .map(([field, value]) => {
+              if (Array.isArray(value)) {
+                return `${field}: ${value.join(", ")}`;
+              }
+              if (typeof value === "string") {
+                return `${field}: ${value}`;
+              }
+              return null;
+            })
+            .filter(Boolean)
+            .join(" | ")
+        : "") ||
+      "Request failed";
     throw new ApiError(message, response.status);
   }
   return body;
@@ -45,14 +127,11 @@ export function toPhotoUrl(path: string | null) {
   if (path.startsWith("http")) {
     return path;
   }
-  if (path.startsWith("/")) {
-    return `${API_PREFIX}${path}`;
-  }
-  return `${API_PREFIX}/${path}`;
+  return apiUrl(path.startsWith("/") ? path : `/${path}`);
 }
 
 export async function login(username: string, password: string): Promise<TokenPair> {
-  const response = await fetch(`${API_PREFIX}/api/auth/login/`, {
+  const response = await apiFetch("/api/auth/login/", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -64,7 +143,7 @@ export async function login(username: string, password: string): Promise<TokenPa
 }
 
 export async function getMyProfile(token: string): Promise<UserProfile> {
-  const response = await fetch(`${API_PREFIX}/api/students/me/`, {
+  const response = await apiFetch("/api/students/me/", {
     headers: {
       Authorization: `Bearer ${token}`,
     },
@@ -74,7 +153,7 @@ export async function getMyProfile(token: string): Promise<UserProfile> {
 }
 
 export async function getUsers(token: string): Promise<UserProfile[]> {
-  const response = await fetch(`${API_PREFIX}/api/students/`, {
+  const response = await apiFetch("/api/students/", {
     headers: {
       Authorization: `Bearer ${token}`,
     },
@@ -106,12 +185,19 @@ function appendCommonUserFields(formData: FormData, payload: Omit<UserCreateInpu
   }
 }
 
+function appendStudentField(formData: FormData, key: string, value?: string | boolean | null) {
+  if (value === undefined || value === null) {
+    return;
+  }
+  formData.append(key, typeof value === "boolean" ? (value ? "true" : "false") : value);
+}
+
 export async function createUser(token: string, payload: UserCreateInput): Promise<UserProfile> {
   const formData = new FormData();
   appendCommonUserFields(formData, payload);
   formData.append("password", payload.password);
 
-  const response = await fetch(`${API_PREFIX}/api/students/`, {
+  const response = await apiFetch("/api/students/", {
     method: "POST",
     headers: {
       Authorization: `Bearer ${token}`,
@@ -126,7 +212,7 @@ export async function updateUser(token: string, payload: UserUpdateInput): Promi
   const formData = new FormData();
   appendCommonUserFields(formData, payload);
 
-  const response = await fetch(`${API_PREFIX}/api/students/${payload.id}/`, {
+  const response = await apiFetch(`/api/students/${payload.id}/`, {
     method: "PATCH",
     headers: {
       Authorization: `Bearer ${token}`,
@@ -137,8 +223,77 @@ export async function updateUser(token: string, payload: UserUpdateInput): Promi
   return parseJson(response);
 }
 
+export async function enrollStudentByTeacher(
+  token: string,
+  payload: StudentCreateInput
+): Promise<UserProfile> {
+  const formData = new FormData();
+  appendStudentField(formData, "username", payload.username);
+  appendStudentField(formData, "password", payload.password);
+  appendStudentField(formData, "email", payload.email || "");
+  appendStudentField(formData, "first_name", payload.first_name || "");
+  appendStudentField(formData, "last_name", payload.last_name || "");
+  appendStudentField(formData, "date_of_birth", payload.date_of_birth || "");
+  appendStudentField(formData, "gender", payload.gender || "");
+  appendStudentField(formData, "current_academic", payload.current_academic || "");
+  if (payload.enrolled_status !== undefined) {
+    appendStudentField(formData, "enrolled_status", payload.enrolled_status);
+  }
+
+  const response = await apiFetch("/api/students/enroll_student_by_teacher/", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+    body: formData,
+  });
+
+  return parseJson(response);
+}
+
+export async function updateStudentByTeacher(
+  token: string,
+  payload: StudentUpdateInput
+): Promise<UserProfile> {
+  const formData = new FormData();
+  appendStudentField(formData, "username", payload.username);
+  appendStudentField(formData, "email", payload.email);
+  appendStudentField(formData, "first_name", payload.first_name);
+  appendStudentField(formData, "last_name", payload.last_name);
+  appendStudentField(formData, "date_of_birth", payload.date_of_birth);
+  appendStudentField(formData, "gender", payload.gender);
+  appendStudentField(formData, "current_academic", payload.current_academic);
+  if (payload.enrolled_status !== undefined) {
+    appendStudentField(formData, "enrolled_status", payload.enrolled_status);
+  }
+
+  const response = await apiFetch(`/api/students/${payload.id}/`, {
+    method: "PATCH",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+    body: formData,
+  });
+
+  return parseJson(response);
+}
+
+export async function deleteStudentByTeacher(token: string, id: number): Promise<void> {
+  const response = await apiFetch(`/api/students/${id}/`, {
+    method: "DELETE",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+
+  if (!response.ok) {
+    const body = await response.json().catch(() => ({}));
+    throw new Error(body?.detail || "Failed to delete student");
+  }
+}
+
 export async function deleteUser(token: string, id: number): Promise<void> {
-  const response = await fetch(`${API_PREFIX}/api/students/${id}/`, {
+  const response = await apiFetch(`/api/students/${id}/`, {
     method: "DELETE",
     headers: {
       Authorization: `Bearer ${token}`,
@@ -149,4 +304,74 @@ export async function deleteUser(token: string, id: number): Promise<void> {
     const body = await response.json().catch(() => ({}));
     throw new Error(body?.detail || "Failed to delete user");
   }
+}
+
+export async function getStudentTasks(token: string, studentId: number): Promise<Task[]> {
+  const response = await apiFetch(`/api/tasks/?student_id=${studentId}`, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+
+  const payload = await parseJson(response);
+  return toList<Task>(payload);
+}
+
+export async function getMyStudents(token: string): Promise<Enrollment[]> {
+  const response = await apiFetch("/api/enrollments/my_students/", {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+
+  const payload = await parseJson(response);
+  return toList<Enrollment>(payload);
+}
+
+export async function getTeacherStudents(token: string, teacherId: number): Promise<Enrollment[]> {
+  const response = await apiFetch(`/api/enrollments/?teacher_id=${teacherId}`, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+
+  const payload = await parseJson(response);
+  return toList<Enrollment>(payload);
+}
+
+export async function createTask(token: string, payload: TaskCreateInput): Promise<Task> {
+  const response = await apiFetch("/api/tasks/", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(payload),
+  });
+
+  return parseJson(response);
+}
+
+export async function submitTaskAnswer(
+  token: string,
+  taskId: number,
+  payload: TaskSubmissionInput
+): Promise<Task> {
+  const formData = new FormData();
+  if (payload.answer_text) {
+    formData.append("answer_text", payload.answer_text);
+  }
+  if (payload.answer_file) {
+    formData.append("answer_file", payload.answer_file);
+  }
+
+  const response = await apiFetch(`/api/tasks/${taskId}/submit_task/`, {
+    method: "PATCH",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+    body: formData,
+  });
+
+  return parseJson(response);
 }

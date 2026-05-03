@@ -29,6 +29,53 @@ urlpatterns = [
         StudentViewSet.as_view({"get": "me"}),
         name="student_me_no_slash",
     ),
+    path(
+        "students/me/",
+        StudentViewSet.as_view({"get": "me"}),
+        name="student_me",
+    ),
+    # Accept detail routes without trailing slash to avoid DELETE redirect/runtime issues.
+    path(
+        "students/<int:pk>",
+        StudentViewSet.as_view(
+            {
+                "get": "retrieve",
+                "patch": "partial_update",
+                "put": "update",
+                "delete": "destroy",
+            }
+        ),
+        name="student_detail_no_slash",
+    ),
+    path(
+        "students/<int:pk>/",
+        StudentViewSet.as_view(
+            {
+                "get": "retrieve",
+                "patch": "partial_update",
+                "put": "update",
+                "delete": "destroy",
+            }
+        ),
+        name="student_detail",
+    ),
+    # Accept task list without trailing slash for POST safety with APPEND_SLASH.
+    path(
+        "tasks",
+        TaskViewSet.as_view({"get": "list", "post": "create"}),
+        name="task_list_no_slash",
+    ),
+    # Accept task submissions with or without trailing slash to avoid PATCH redirects.
+    path(
+        "tasks/<int:pk>/submit_task",
+        TaskViewSet.as_view({"patch": "submit_task"}),
+        name="task_submit_no_slash",
+    ),
+    path(
+        "tasks/<int:pk>/submit_task/",
+        TaskViewSet.as_view({"patch": "submit_task"}),
+        name="task_submit",
+    ),
     # API endpoints
     path("", include(router.urls)),
 ]

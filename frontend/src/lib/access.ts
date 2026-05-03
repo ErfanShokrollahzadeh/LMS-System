@@ -8,7 +8,7 @@ export function canAccessSection(viewerRole: UserRole, section: AppSection) {
   }
 
   if (viewerRole === "teacher") {
-    return section === "student" || section === "teacher";
+    return section === "teacher";
   }
 
   return section === "student";
