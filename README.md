@@ -138,10 +138,32 @@ API base URL:
 Admin panel:
 
 - http://127.0.0.1:8000/admin/
+- http://127.0.0.1:8000/admin (redirects to /admin/)
 
 Health endpoint:
 
 - http://127.0.0.1:8000/api/health/
+
+## Frontend (Next.js)
+
+The frontend lives in the `frontend/` folder and runs on port 3000 by default.
+
+### Run the frontend
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+Frontend URL:
+
+- http://127.0.0.1:3000/
+
+Notes:
+
+- The backend root path `/` redirects to the frontend home on port 3000.
+- Only `/admin` and `/admin/` stay on port 8000 for Django admin.
 
 ## API Surface (High-Level)
 
