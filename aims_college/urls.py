@@ -25,32 +25,6 @@ from core.views import health
 urlpatterns = [
     path("admin/", admin.site.urls),
     path("admin", RedirectView.as_view(url="/admin/", permanent=False)),
-    path("", RedirectView.as_view(url="http://127.0.0.1:3000/", permanent=False)),
-    path(
-        "login",
-        RedirectView.as_view(
-            url="http://127.0.0.1:3000/login", permanent=False),
-    ),
-    path(
-        "student/list",
-        RedirectView.as_view(
-            url="http://127.0.0.1:3000/student/list", permanent=False),
-    ),
-    path(
-        "teacher/list",
-        RedirectView.as_view(
-            url="http://127.0.0.1:3000/teacher/list", permanent=False),
-    ),
-    path(
-        "manager/list",
-        RedirectView.as_view(
-            url="http://127.0.0.1:3000/manager/list", permanent=False),
-    ),
-    path(
-        "profile",
-        RedirectView.as_view(
-            url="http://127.0.0.1:3000/profile", permanent=False),
-    ),
     path("api/health/", health, name="health"),
     path("api/", include("core.urls")),
     path("api-auth/", include("rest_framework.urls")),
